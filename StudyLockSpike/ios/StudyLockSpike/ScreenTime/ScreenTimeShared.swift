@@ -5,7 +5,7 @@ import ManagedSettings
 
 @available(iOS 16.0, *)
 enum ScreenTimeShared {
-  static let appGroupID = "group.com.studylockspike.screentime"
+  static let appGroupID = "group.com.hjrktng.studylockspike.screentime"
   static let selectionKey = "StudyLockSpikeFamilyActivitySelection"
   static let storeName = ManagedSettingsStore.Name("StudyLockSpikeStore")
   static let activityName = DeviceActivityName("StudyLockSpikeSchedule")

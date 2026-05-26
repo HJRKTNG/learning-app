@@ -6,7 +6,7 @@
   <true/>
   <key>com.apple.security.application-groups</key>
   <array>
-    <string>group.com.studylockspike.screentime</string>
+    <string>group.com.hjrktng.studylockspike.screentime</string>
   </array>
 </dict>
 </plist>

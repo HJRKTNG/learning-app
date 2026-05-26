@@ -17,3 +17,5 @@
 - Apple Developer Program加入後にiPhone実機でScreen Time API連携を確認するための最短手順を `StudyLockSpike/docs/ScreenTimeSpikeTest.md` に追記。
 - Bundle Identifier、App Groups、Family Controls capability、Provisioning Profile、Developer Mode、実機ビルドコマンドの確認ポイントを整理。
 - READMEの実機テスト手順案内を、Apple Developer Program加入後の設定内容が分かる表現に更新。
+- iPhone実機インストールに向け、4つのiOS targetにApple Development Team `63NW3234RU` を設定し、Bundle IdentifierとApp Group IDを実機署名用の値へ更新。
+- `HJRのiPhone` 向けのCLIビルドを試行し、XcodeのApple Developerアカウント状態が未有効で `No Account for Team "63NW3234RU"` によりProvisioning Profile作成前に停止したことを記録。

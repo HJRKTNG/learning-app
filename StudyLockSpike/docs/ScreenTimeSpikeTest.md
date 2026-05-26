@@ -5,11 +5,11 @@
 - React Nativeプロジェクト名: `StudyLockSpike`
 - Xcodeで開くファイル: `ios/StudyLockSpike.xcworkspace`
 - iOS Deployment Target: `16.0`
-- メインBundle Identifier: `com.studylockspike.app`
-- DeviceActivityMonitor Extension: `com.studylockspike.app.DeviceActivityMonitorExtension`
-- ShieldConfiguration Extension: `com.studylockspike.app.ShieldConfigurationExtension`
-- ShieldAction Extension: `com.studylockspike.app.ShieldActionExtension`
-- App Group仮ID: `group.com.studylockspike.screentime`
+- メインBundle Identifier: `com.hjrktng.studylockspike`
+- DeviceActivityMonitor Extension: `com.hjrktng.studylockspike.DeviceActivityMonitorExtension`
+- ShieldConfiguration Extension: `com.hjrktng.studylockspike.ShieldConfigurationExtension`
+- ShieldAction Extension: `com.hjrktng.studylockspike.ShieldActionExtension`
+- App Group ID: `group.com.hjrktng.studylockspike.screentime`
 - 必要Capability: Family Controls、App Groups
 
 ## Apple Developer Program加入後の最短実機確認
@@ -63,7 +63,7 @@ rtk env HERMES_ENGINE_TARBALL_PATH=/tmp/hermes-ios-250829098.0.10-debug.tar.gz p
 3. メインアプリと3つのExtension targetのSigning & Capabilitiesを開く。
 4. Apple Developer Teamを設定する。
 5. Bundle Identifierを自分のDeveloper Teamで登録可能な値へ必要に応じて変更する。
-6. App Groupsで `group.com.studylockspike.screentime` を登録、または実際のApp Group IDへ変更する。
+6. App Groupsで `group.com.hjrktng.studylockspike.screentime` を登録、または実際のApp Group IDへ変更する。
 7. Family Controls capabilityをメインアプリとExtension targetに追加する。
 8. Provisioning ProfileにFamily Controls entitlementが含まれていることを確認する。
 9. メインアプリとExtension targetのApp Groupが同じ値であることを確認する。
@@ -92,9 +92,10 @@ rtk env HERMES_ENGINE_TARBALL_PATH=/tmp/hermes-ios-250829098.0.10-debug.tar.gz p
 ## 現在のブロッカー・注意点
 
 - 実機確認は未実施。
-- Apple Developer Teamは未設定。
+- Apple Developer Team `63NW3234RU` は設定済み。
+- CLI実機ビルドは、Xcode側でApple Developerアカウントが有効なログイン状態として見えておらず、`No Account for Team "63NW3234RU"` で停止中。
 - Family Controls entitlementのDeveloper Portal側状態は未確認。
-- App Group IDは仮値のため、Developer Portalで登録するか実際の値へ変更が必要。
+- App Group IDは `group.com.hjrktng.studylockspike.screentime` に更新済み。Developer Portalで登録・Profile反映が必要。
 - App Store配布用のFamily Controls entitlement申請は未対応。
 - DeviceActivityMonitor Extensionの発火は実機・権限・Provisioning Profile依存のため未確認。
 - シミュレーターではScreen Time APIの実動作確認はできない前提。
@@ -102,6 +103,7 @@ rtk env HERMES_ENGINE_TARBALL_PATH=/tmp/hermes-ios-250829098.0.10-debug.tar.gz p
 ## よくある詰まりどころ
 
 - `Provisioning profile ... doesn't include com.apple.developer.family-controls` が出る場合: そのtargetのIdentifier/Capability/ProfileにFamily Controlsが入っていません。メインアプリだけでなく3つのExtensionも確認します。
+- `No Account for Team "63NW3234RU"` が出る場合: Xcode > Settings > AccountsでApple Developerアカウントへログインし直し、Teamが表示される状態にします。
 - `container_create_or_lookup_app_group_path_by_app_group_identifier` 系のエラーが出る場合: App Group IDがDeveloper Portal、entitlements、`ScreenTimeShared.appGroupID` で一致していません。
 - Pickerは出るがブロックされない場合: iPhone実機、Screen Time権限、App Group共有、選択済み状態、Extension targetの署名を順番に確認します。
 - DeviceActivityMonitorが時間になっても発火しない場合: まず「今すぐブロック」でManagedSettings単体が効くか確認し、その後にスケジュールの開始/終了時刻を現在時刻の数分後に設定して試します。
