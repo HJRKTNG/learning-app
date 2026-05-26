@@ -19,3 +19,4 @@
 - READMEの実機テスト手順案内を、Apple Developer Program加入後の設定内容が分かる表現に更新。
 - iPhone実機インストールに向け、4つのiOS targetにApple Development Team `63NW3234RU` を設定し、Bundle IdentifierとApp Group IDを実機署名用の値へ更新。
 - `HJRのiPhone` 向けのCLIビルドを試行し、XcodeのApple Developerアカウント状態が未有効で `No Account for Team "63NW3234RU"` によりProvisioning Profile作成前に停止したことを記録。
+- 既存Provisioning Profileと実機ビルド結果に合わせてApple Developer Teamを `JR3QAG9C64` に修正し、`HJRのiPhone` へのインストールと起動が成功したことを確認。

@@ -91,11 +91,10 @@ rtk env HERMES_ENGINE_TARBALL_PATH=/tmp/hermes-ios-250829098.0.10-debug.tar.gz p
 
 ## 現在のブロッカー・注意点
 
-- 実機確認は未実施。
-- Apple Developer Team `63NW3234RU` は設定済み。
-- CLI実機ビルドは、Xcode側でApple Developerアカウントが有効なログイン状態として見えておらず、`No Account for Team "63NW3234RU"` で停止中。
-- Family Controls entitlementのDeveloper Portal側状態は未確認。
-- App Group IDは `group.com.hjrktng.studylockspike.screentime` に更新済み。Developer Portalで登録・Profile反映が必要。
+- `HJRのiPhone` への実機インストールと起動は確認済み。
+- Apple Developer Team `JR3QAG9C64` は設定済み。
+- `HJRのiPhone` へのDebugビルド、インストール、起動は成功済み。
+- 署名済みアプリのentitlementsに `com.apple.developer.family-controls` と `group.com.hjrktng.studylockspike.screentime` が含まれることを確認済み。
 - App Store配布用のFamily Controls entitlement申請は未対応。
 - DeviceActivityMonitor Extensionの発火は実機・権限・Provisioning Profile依存のため未確認。
 - シミュレーターではScreen Time APIの実動作確認はできない前提。
@@ -103,7 +102,7 @@ rtk env HERMES_ENGINE_TARBALL_PATH=/tmp/hermes-ios-250829098.0.10-debug.tar.gz p
 ## よくある詰まりどころ
 
 - `Provisioning profile ... doesn't include com.apple.developer.family-controls` が出る場合: そのtargetのIdentifier/Capability/ProfileにFamily Controlsが入っていません。メインアプリだけでなく3つのExtensionも確認します。
-- `No Account for Team "63NW3234RU"` が出る場合: Xcode > Settings > AccountsでApple Developerアカウントへログインし直し、Teamが表示される状態にします。
+- `No Account for Team ...` が出る場合: Xcode > Settings > AccountsでApple Developerアカウントへログインし直し、Teamが表示される状態にします。
 - `container_create_or_lookup_app_group_path_by_app_group_identifier` 系のエラーが出る場合: App Group IDがDeveloper Portal、entitlements、`ScreenTimeShared.appGroupID` で一致していません。
 - Pickerは出るがブロックされない場合: iPhone実機、Screen Time権限、App Group共有、選択済み状態、Extension targetの署名を順番に確認します。
 - DeviceActivityMonitorが時間になっても発火しない場合: まず「今すぐブロック」でManagedSettings単体が効くか確認し、その後にスケジュールの開始/終了時刻を現在時刻の数分後に設定して試します。
