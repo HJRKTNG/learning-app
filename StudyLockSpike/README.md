@@ -4,7 +4,7 @@ This is a new [**React Native**](https://reactnative.dev) project, bootstrapped 
 
 React NativeからiOS Screen Time APIを呼び出し、FamilyActivityPickerで選択したアプリをManagedSettings/DeviceActivityで制限できるか検証するための最小アプリです。
 
-実機テスト手順と現在のブロッカーは [docs/ScreenTimeSpikeTest.md](docs/ScreenTimeSpikeTest.md) にまとめています。
+Apple Developer Program加入後の実機テスト手順、Signing & Capabilities設定、現在のブロッカーは [docs/ScreenTimeSpikeTest.md](docs/ScreenTimeSpikeTest.md) にまとめています。
 
 # Getting Started
 

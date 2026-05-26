@@ -11,3 +11,9 @@
 - 実機テスト手順を `StudyLockSpike/docs/ScreenTimeSpikeTest.md` に追加し、READMEから参照できるように更新。
 - 日本語パス配下で `pod install` が失敗する問題に対応するため、React Native Coreをソース利用に切り替え、Hermes tarballを指定してPodsをインストール。
 - `npx tsc --noEmit`、`npm run lint -- --max-warnings=0`、`xcodebuild -list`、iOSシミュレータ向け `xcodebuild` が成功したことを確認。実機でのScreen Time動作確認は未実施。
+
+## 2026-05-26
+
+- Apple Developer Program加入後にiPhone実機でScreen Time API連携を確認するための最短手順を `StudyLockSpike/docs/ScreenTimeSpikeTest.md` に追記。
+- Bundle Identifier、App Groups、Family Controls capability、Provisioning Profile、Developer Mode、実機ビルドコマンドの確認ポイントを整理。
+- READMEの実機テスト手順案内を、Apple Developer Program加入後の設定内容が分かる表現に更新。
