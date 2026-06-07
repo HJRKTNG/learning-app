@@ -20,3 +20,8 @@
 - iPhone実機インストールに向け、4つのiOS targetにApple Development Team `63NW3234RU` を設定し、Bundle IdentifierとApp Group IDを実機署名用の値へ更新。
 - `HJRのiPhone` 向けのCLIビルドを試行し、XcodeのApple Developerアカウント状態が未有効で `No Account for Team "63NW3234RU"` によりProvisioning Profile作成前に停止したことを記録。
 - 既存Provisioning Profileと実機ビルド結果に合わせてApple Developer Teamを `JR3QAG9C64` に修正し、`HJRのiPhone` へのインストールと起動が成功したことを確認。
+
+## 2026-06-08
+
+- 外部の問題生成API `gen-study-api` (https://gen-study-api.onrender.com/generate) の動作確認を実施。`/health`・認証・ルーティングは正常だが、`/generate` の生成本体が極端に遅く（東大レベル確率漸化式で約526秒、高校二次方程式で約177秒）、短いタイムアウトでは無応答に見えることを確認。出力内容自体は数学的にも正確な良問だった。
+- 生成された2問（確率漸化式／二次方程式）の問題・解答を、数式をMathJaxでレンダリングして整形したHTML/PDFとして `生成問題集/` フォルダに保存（`問題集_2026-06-08.html`、`問題集_2026-06-08.pdf`、A4・全4ページ）。LaTeXツール未導入のためChromeヘッドレス（`--headless=old --print-to-pdf`）でPDF化。

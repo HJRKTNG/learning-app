@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>生成問題集</title>
+<script>
+window.MathJax = {
+  tex: { inlineMath: [['$','$']], displayMath: [['$$','$$']], processEscapes: true },
+  chtml: { scale: 1.0, displayAlign: 'left', displayIndent: '0' },
+  startup: {
+    pageReady: function () {
+      return MathJax.startup.defaultPageReady().then(function () {
+        document.title = 'READY';
+      });
+    }
+  }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+<style>
+  :root {
+    --ink: #1a1a2e;
+    --muted: #5b5b6b;
+    --accent: #2f4f8f;
+    --accent-soft: #eef2fb;
+    --line: #d9dde6;
+    --sol-bg: #f7f8fb;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body {
+    font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", "Noto Sans JP", sans-serif;
+    color: var(--ink);
+    line-height: 1.85;
+    margin: 0;
+    font-size: 11.2pt;
+  }
+  @page { size: A4; margin: 18mm 16mm 20mm 16mm; }
+
+  .cover {
+    border-bottom: 3px solid var(--accent);
+    padding-bottom: 14px;
+    margin-bottom: 26px;
+  }
+  .cover h1 {
+    font-size: 22pt;
+    margin: 0 0 4px 0;
+    letter-spacing: 0.04em;
+    color: var(--accent);
+  }
+  .cover .sub { color: var(--muted); font-size: 9.5pt; margin: 0; }
+
+  .problem {
+    margin-bottom: 30px;
+  }
+  .problem + .problem { page-break-before: always; }
+
+  .phead {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    flex-wrap: wrap;
+    border-left: 5px solid var(--accent);
+    padding: 2px 0 2px 12px;
+    margin-bottom: 12px;
+  }
+  .pno {
+    font-size: 15pt;
+    font-weight: 700;
+    color: var(--accent);
+  }
+  .ptopic { font-size: 14pt; font-weight: 700; }
+
+  .chips { margin: 4px 0 16px 0; }
+  .chip {
+    display: inline-block;
+    background: var(--accent-soft);
+    color: var(--accent);
+    border: 1px solid #cdd8ef;
+    border-radius: 999px;
+    padding: 2px 11px;
+    font-size: 8.6pt;
+    font-weight: 600;
+    margin-right: 6px;
+    margin-bottom: 4px;
+  }
+
+  .label {
+    display: inline-block;
+    font-weight: 700;
+    font-size: 10.5pt;
+    color: #fff;
+    background: var(--accent);
+    border-radius: 4px;
+    padding: 1px 10px;
+    margin: 8px 0 6px 0;
+  }
+  .label.sol { background: #6b7280; }
+
+  .body {
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .solution {
+    white-space: pre-wrap;
+    word-break: break-word;
+    background: var(--sol-bg);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 12px 16px;
+    line-height: 1.7;
+  }
+  mjx-container { margin: 0.1em 0 !important; }
+  mjx-container[display="true"] { margin: 0.4em 0 !important; }
+
+  .footer {
+    margin-top: 8px;
+    font-size: 8pt;
+    color: var(--muted);
+  }
+</style>
+</head>
+<body>
+  <div class="cover">
+    <h1>生成問題集</h1>
+    <p class="sub">生成日: 2026-06-08 ／ 出典: gen-study-api (https://gen-study-api.onrender.com) ／ 数式は MathJax でレンダリング</p>
+  </div>
+  <div id="root"></div>
+
+<script>
+const DATA = [{"subject": "数学 (math)", "level": "東京大学レベル (University of Tokyo)", "topic": "確率漸化式 (Probability Recurrence Relations)", "time": "約526秒", "problem": "1個のサイコロを $n$ 回投げる。$1$ または $2$ の目が出た回数が $3$ の倍数である確率 $p_n$ を求めよ。また，$\\displaystyle \\lim_{n\\to\\infty} p_n$ を求めよ。", "solution": "（解）\n$n$ 回投げたとき，$1$ または $2$ の目が出た回数を $X_n$ とし，$X_n$ を $3$ で割った余りが $0,1,2$ である確率をそれぞれ $p_n, q_n, r_n$ とおく。\n$n=0$ のとき，$p_0=1,\\ q_0=r_0=0$ である。\n$n \\ge 1$ のとき，各試行で $1,2$ の目が出る確率は $\\frac{1}{3}$，それ以外は $\\frac{2}{3}$ だから，\n$$\n\\begin{aligned}\np_n &= \\frac{2}{3} p_{n-1} + \\frac{1}{3} r_{n-1} \\\\\nq_n &= \\frac{2}{3} q_{n-1} + \\frac{1}{3} p_{n-1} \\\\\nr_n &= \\frac{2}{3} r_{n-1} + \\frac{1}{3} q_{n-1}\n\\end{aligned}\n$$\nが成り立つ。\nこれらから $p_n$ だけの漸化式を導く。\nまず，\n$$\nr_{n-1} = 3p_n - 2p_{n-1} \\quad\\text{…①}\n$$\n$$\nr_{n-2} = 3p_{n-1} - 2p_{n-2} \\quad\\text{…②}\n$$\nまた，$r_n = \\frac{2}{3} r_{n-1} + \\frac{1}{3} q_{n-1}$ より $3r_n - 2r_{n-1} = q_{n-1}$ が成り立つ。$n$ を $n-1$ に置き換えて\n$$\nq_{n-2} = 3r_{n-1} - 2r_{n-2}\n$$\nこれに①②を代入して\n$$\n\\begin{aligned}\nq_{n-2} &= 3(3p_n - 2p_{n-1}) - 2(3p_{n-1} - 2p_{n-2}) \\\\\n&= 9p_n - 12p_{n-1} + 4p_{n-2} \\quad\\text{…③}\n\\end{aligned}\n$$\n次に，$q_{n-1} = \\frac{2}{3} q_{n-2} + \\frac{1}{3} p_{n-2}$ …④\n一方，$r_n = 3p_{n+1} - 2p_n$ を用いて $3r_n - 2r_{n-1} = q_{n-1}$ を計算すると\n$$\n\\begin{aligned}\nq_{n-1} &= 3(3p_{n+1} - 2p_n) - 2(3p_n - 2p_{n-1}) \\\\\n&= 9p_{n+1} - 12p_n + 4p_{n-1} \\quad\\text{…⑤}\n\\end{aligned}\n$$\n③を④に代入すると\n$$\n\\begin{aligned}\nq_{n-1} &= \\frac{2}{3}(9p_n - 12p_{n-1} + 4p_{n-2}) + \\frac{1}{3} p_{n-2} \\\\\n&= 6p_n - 8p_{n-1} + 3p_{n-2}\n\\end{aligned}\n$$\n⑤と等しいので\n$$\n9p_{n+1} - 12p_n + 4p_{n-1} = 6p_n - 8p_{n-1} + 3p_{n-2}\n$$\n整理して\n$$\n9p_{n+1} - 18p_n + 12p_{n-1} - 3p_{n-2} = 0\n$$\n両辺を $3$ で割り，$n$ を $n-1$ に置き換えると，$n \\ge 3$ に対して\n$$\np_n - 2p_{n-1} + \\frac{4}{3} p_{n-2} - \\frac{1}{3} p_{n-3} = 0 \\quad\\text{…(＊)}\n$$\nを得る。\n(＊) の特性方程式は\n$$\nt^3 - 2t^2 + \\frac{4}{3}t - \\frac{1}{3} = 0\n$$\nすなわち\n$$\n3t^3 - 6t^2 + 4t - 1 = 0 \\iff (t-1)(3t^2 - 3t + 1) = 0\n$$\nよって\n$$\nt = 1,\\quad t = \\frac{3 \\pm \\sqrt{3} i}{6} = \\frac{1}{2} \\pm \\frac{i}{2\\sqrt{3}}\n$$\nここで $\\frac{1}{2} \\pm \\frac{i}{2\\sqrt{3}} = \\frac{1}{\\sqrt{3}} e^{\\pm i\\pi/6}$ と表せるから，\n$$\np_n = A \\cdot 1^n + B \\left(\\frac{1}{\\sqrt{3}}\\right)^n \\cos\\frac{n\\pi}{6} + C \\left(\\frac{1}{\\sqrt{3}}\\right)^n \\sin\\frac{n\\pi}{6}\n$$\nの形になる。\n初期条件 $p_0 = 1,\\ p_1 = \\frac{2}{3},\\ p_2 = \\frac{4}{9}$ を用いて定数 $A,B,C$ を定める。\n$n=0$ : $A + B = 1$\n$n=1$ : $A + B \\cdot \\frac{1}{\\sqrt{3}} \\cdot \\frac{\\sqrt{3}}{2} + C \\cdot \\frac{1}{\\sqrt{3}} \\cdot \\frac{1}{2} = A + \\frac{B}{2} + \\frac{C}{2\\sqrt{3}} = \\frac{2}{3}$\n$n=2$ : $A + B \\cdot \\left(\\frac{1}{\\sqrt{3}}\\right)^2 \\cos\\frac{\\pi}{3} + C \\left(\\frac{1}{\\sqrt{3}}\\right)^2 \\sin\\frac{\\pi}{3} = A + \\frac{B}{3} \\cdot \\frac{1}{2} + \\frac{C}{3} \\cdot \\frac{\\sqrt{3}}{2} = A + \\frac{B}{6} + \\frac{\\sqrt{3}C}{6} = \\frac{4}{9}$\nこれらを解くと $A = \\frac{1}{3},\\ B = \\frac{2}{3},\\ C = 0$ を得る。\nしたがって\n$$\np_n = \\frac{1}{3} + \\frac{2}{3} \\left(\\frac{1}{\\sqrt{3}}\\right)^n \\cos\\frac{n\\pi}{6}\n$$\nまた，$\\displaystyle \\lim_{n\\to\\infty} \\left(\\frac{1}{\\sqrt{3}}\\right)^n = 0$ より\n$$\n\\lim_{n\\to\\infty} p_n = \\frac{1}{3}\n$$\nである。"}, {"subject": "数学 (math)", "level": "高校 (high school)", "topic": "二次方程式", "time": "約177秒", "problem": "実数 $a$ に対して、$x$ の2次方程式 $$x^2 - (a+3)x + a+2 = 0$$ を考える。このとき、次の問いに答えよ。\n(1) この方程式が異なる2つの実数解をもつための $a$ の条件を求めよ。\n(2) この方程式の解がともに $0$ 以上となるための $a$ の値の範囲を求めよ。\n(3) (2)のとき、解の2乗の和の最小値と、そのときの $a$ の値を求めよ。", "solution": "(1) 判別式を $D$ とすると、\n$$D = (a+3)^2 - 4(a+2) = a^2+6a+9-4a-8 = a^2+2a+1 = (a+1)^2$$\n異なる2つの実数解をもつのは $D > 0$ のときなので、\n$$(a+1)^2 > 0 \\quad \\therefore \\quad a \\neq -1$$\n(2) 2解を $\\alpha,\\,\\beta$ とおくと、解と係数の関係より\n$$\\alpha+\\beta = a+3,\\quad \\alpha\\beta = a+2$$\n解がともに $0$ 以上であるための条件は、$D \\ge 0$、$\\alpha+\\beta \\ge 0$、$\\alpha\\beta \\ge 0$ である。\n$D \\ge 0$ は常に成り立つので、\n$$\\begin{cases} a+3 \\ge 0 \\\\ a+2 \\ge 0 \\end{cases}$$\nこれを解いて $a \\ge -3$ かつ $a \\ge -2$ より、$a \\ge -2$。\n(3) $$\\alpha^2+\\beta^2 = (\\alpha+\\beta)^2 - 2\\alpha\\beta = (a+3)^2 - 2(a+2) = a^2+4a+5 = (a+2)^2 + 1$$\n(2)より $a \\ge -2$ であるから、$\\alpha^2+\\beta^2$ は $a=-2$ のとき最小値 $1$ をとる。\nしたがって、最小値 $1$ ($a=-2$ のとき)。"}];
+const root = document.getElementById('root');
+DATA.forEach((it, i) => {
+  const sec = document.createElement('section');
+  sec.className = 'problem';
+
+  const head = document.createElement('div');
+  head.className = 'phead';
+  const pno = document.createElement('span');
+  pno.className = 'pno';
+  pno.textContent = '問題 ' + (i + 1);
+  const topic = document.createElement('span');
+  topic.className = 'ptopic';
+  topic.textContent = it.topic;
+  head.appendChild(pno);
+  head.appendChild(topic);
+  sec.appendChild(head);
+
+  const chips = document.createElement('div');
+  chips.className = 'chips';
+  [['教科', it.subject], ['レベル', it.level], ['生成時間', it.time]].forEach(([k, v]) => {
+    const c = document.createElement('span');
+    c.className = 'chip';
+    c.textContent = k + ': ' + v;
+    chips.appendChild(c);
+  });
+  sec.appendChild(chips);
+
+  const plabel = document.createElement('div');
+  plabel.className = 'label';
+  plabel.textContent = '問題';
+  sec.appendChild(plabel);
+
+  const pbody = document.createElement('div');
+  pbody.className = 'body';
+  pbody.textContent = it.problem;
+  sec.appendChild(pbody);
+
+  const slabel = document.createElement('div');
+  slabel.className = 'label sol';
+  slabel.textContent = '解答';
+  sec.appendChild(slabel);
+
+  const sbody = document.createElement('div');
+  sbody.className = 'solution';
+  sbody.textContent = it.solution;
+  sec.appendChild(sbody);
+
+  root.appendChild(sec);
+});
+</script>
+</body>
+</html>
