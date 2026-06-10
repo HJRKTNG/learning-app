@@ -1,6 +1,7 @@
 {
   "extends": "@react-native/typescript-config",
   "compilerOptions": {
+    "lib": ["esnext", "dom", "dom.iterable"],
     "types": ["jest"]
   },
   "include": ["**/*.ts", "**/*.tsx"],

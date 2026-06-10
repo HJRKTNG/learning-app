@@ -1,7 +1,8 @@
 import React from 'react';
-import { StatusBar, useColorScheme } from 'react-native';
+import { Platform, StatusBar, useColorScheme } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { ScreenTimeSpikeScreen } from './src/screens/ScreenTimeSpikeScreen';
+import { DevBrowserShell } from './src/screens/DevBrowserShell';
+import { LearningAppScreen } from './src/screens/LearningAppScreen';
 
 function App() {
   const isDarkMode = useColorScheme() === 'dark';
@@ -9,7 +10,7 @@ function App() {
   return (
     <SafeAreaProvider>
       <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-      <ScreenTimeSpikeScreen />
+      {Platform.OS === 'web' ? <DevBrowserShell /> : <LearningAppScreen />}
     </SafeAreaProvider>
   );
 }

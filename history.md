@@ -25,3 +25,12 @@
 
 - 外部の問題生成API `gen-study-api` (https://gen-study-api.onrender.com/generate) の動作確認を実施。`/health`・認証・ルーティングは正常だが、`/generate` の生成本体が極端に遅く（東大レベル確率漸化式で約526秒、高校二次方程式で約177秒）、短いタイムアウトでは無応答に見えることを確認。出力内容自体は数学的にも正確な良問だった。
 - 生成された2問（確率漸化式／二次方程式）の問題・解答を、数式をMathJaxでレンダリングして整形したHTML/PDFとして `生成問題集/` フォルダに保存（`問題集_2026-06-08.html`、`問題集_2026-06-08.pdf`、A4・全4ページ）。LaTeXツール未導入のためChromeヘッドレス（`--headless=old --print-to-pdf`）でPDF化。
+
+## 2026-06-11
+
+- `StudyLockSpike` にReact Native Web/Viteの開発用ブラウザ環境を追加し、`npm run web` でiPhoneにインストールせずUI確認できる構成にした。
+- `学習アプリワークフロー` のUIマップを参考に、ホーム、ロック通知、ミッション、問題、撮影、採点、結果、再挑戦、解除、設定のReact Native画面と、左側の調整ダッシュボードを実装。
+- 問題生成API `https://gen-study-api.onrender.com/generate` を呼び出すクライアントを追加し、Bearer tokenは `.env.local` または開発ダッシュボードから入力する形にしてソースへ直書きしない運用にした。
+- Windows共同開発者向けにブラウザ起動手順とAPI環境変数の設定方法を `StudyLockSpike/README.md` に追記。
+- Windows PowerShellでも迷わず起動できるように、`.env.local` 作成手順を `Copy-Item` 付きで追記。
+- `npx tsc --noEmit`、`npm run lint -- --max-warnings=0`、`npm test -- --runInBand`、`npm run web:build` が成功し、Chromeヘッドレスで `http://localhost:5173/` のWebプレビュー表示を確認。

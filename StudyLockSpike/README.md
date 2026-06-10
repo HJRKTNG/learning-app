@@ -6,6 +6,45 @@ React NativeからiOS Screen Time APIを呼び出し、FamilyActivityPickerで�
 
 Apple Developer Program加入後の実機テスト手順、Signing & Capabilities設定、現在のブロッカーは [docs/ScreenTimeSpikeTest.md](docs/ScreenTimeSpikeTest.md) にまとめています。
 
+## 学習アプリUIのブラウザ開発
+
+`学習アプリワークフロー` のUIマップを参考に、React Native本体UIをブラウザで確認できる開発用シェルを追加しています。左側のダッシュボードで画面・ロック状態・進捗・問題生成API設定を切り替え、右側のiPhoneプレビューで挙動を確認できます。
+
+```sh
+npm install
+cp .env.example .env.local
+npm run web
+```
+
+Windows PowerShellの場合は以下です。
+
+```powershell
+npm install
+Copy-Item .env.example .env.local
+npm run web
+```
+
+ブラウザで `http://localhost:5173/` を開きます。Windows共同開発者も同じ手順で確認できます。
+
+問題生成APIは以下の環境変数または左ダッシュボードから設定します。Bearer tokenは `.env.local` にだけ置き、Gitには含めないでください。
+
+```sh
+VITE_GEN_STUDY_API_URL=https://gen-study-api.onrender.com/generate
+VITE_GEN_STUDY_API_TOKEN=your_local_token
+```
+
+現在のデフォルト生成リクエストは次の内容です。
+
+```json
+{
+  "subject": "math",
+  "level": "University of Tokyo",
+  "topic": "Probability Recurrence Relations"
+}
+```
+
+APIの応答は問題画面に反映されます。外部APIの生成には時間がかかる場合があります。
+
 # Getting Started
 
 > **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
