@@ -34,3 +34,10 @@
 - Windows共同開発者向けにブラウザ起動手順とAPI環境変数の設定方法を `StudyLockSpike/README.md` に追記。
 - Windows PowerShellでも迷わず起動できるように、`.env.local` 作成手順を `Copy-Item` 付きで追記。
 - `npx tsc --noEmit`、`npm run lint -- --max-warnings=0`、`npm test -- --runInBand`、`npm run web:build` が成功し、Chromeヘッドレスで `http://localhost:5173/` のWebプレビュー表示を確認。
+- CCSDD（Context/Contract/Scenario/Design/Development）形式で、生成問題、TeX表示、答案撮影、OCR、AI採点の設計方針を `StudyLockSpike/docs/CCSDD-LearningWorkflow.md` に追加。
+- 生成APIレスポンスの正規化を強化し、問題文・解答・解説・LaTeX/MMDを `GeneratedProblem` として扱うようにした。
+- WebプレビューでKaTeXによるTeX整形表示を追加し、ネイティブ側は読みやすいテキスト表示へフォールバックする `MathContent` を実装。
+- ブラウザで答案撮影、画像アップロード、手動入力ができる `CameraCapture` と、将来のOCR/AI採点APIへ差し替え可能な `GradingService` を追加。
+- 問題画面、撮影画面、採点中画面、正解/不正解画面を生成問題・撮影答案・採点結果に接続し、単なる静的モックではなく一連の学習フローとして動くようにした。
+- `?screen=problem` や `?screen=camera` で開発ブラウザの初期画面を直接指定できるようにし、ChromeヘッドレスでTeX問題画面と撮影画面を確認。
+- TeX分割と採点サービス境界のJestテストを追加し、`lint`、`tsc`、`jest`、`web:build` が成功したことを確認。

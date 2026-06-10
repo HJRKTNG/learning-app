@@ -9,12 +9,20 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { CameraCapture } from '../components/CameraCapture';
+import { MathContent } from '../components/MathContent';
 import {
   GeneratedProblem,
   GenerateProblemConfig,
   GenerateProblemRequest,
   generateStudyProblem,
 } from '../api/genStudyApi';
+import {
+  CapturedAnswer,
+  GradingResult,
+  gradeCapturedAnswer,
+} from '../services/gradingService';
+import { screenTitles } from './learningScreenOptions';
 
 export type LearningScreenId =
   | 'home'
@@ -63,47 +71,17 @@ const defaultRequest: GenerateProblemRequest = {
 };
 
 const fallbackProblem: GeneratedProblem = {
-  answer: '頂点 (2, -1)',
-  explanation: '平方完成すると y = (x - 2)^2 - 1 となるため、頂点は (2, -1) です。',
-  problem: 'y = x^2 - 4x + 3 の頂点の座標を求めよ。',
+  answer: '$\\frac{2}{3}$',
+  explanation:
+    '漸化式を状態ごとに分け、求めたい確率を $p_n$ とおく。遷移確率から一次漸化式を作り、固定点との差を取ると等比型に帰着できる。',
+  latex:
+    '\\text{Let } p_n \\text{ be the target probability. Derive } p_{n+1}=a p_n+b.',
+  problem:
+    '袋の中に赤玉と白玉がある。操作を繰り返したとき、$n$ 回後に赤玉を引く確率を $p_n$ とする。遷移条件から漸化式を立て、$\\lim_{n\\to\\infty}p_n$ を求めよ。',
   raw: {},
-  title: '二次関数・頂点',
+  source: 'fallback',
+  title: '確率漸化式・導入問題',
 };
-
-const screenTitles: Record<LearningScreenId, string> = {
-  camera: '解答を撮影',
-  correct: '採点結果',
-  grading: '採点中',
-  home: 'ホーム',
-  lock: 'ロック通知',
-  mission: '今日のミッション',
-  missionResult: 'ミッション結果',
-  problem: '問題',
-  retry: '再挑戦',
-  settings: '設定',
-  unlock: '解除完了',
-  wrong: '採点結果',
-};
-
-const screenOrder: LearningScreenId[] = [
-  'home',
-  'lock',
-  'mission',
-  'problem',
-  'camera',
-  'grading',
-  'correct',
-  'wrong',
-  'missionResult',
-  'retry',
-  'unlock',
-  'settings',
-];
-
-export const learningScreenOptions = screenOrder.map(id => ({
-  id,
-  label: screenTitles[id],
-}));
 
 const clamp = (value: number, min: number, max: number) =>
   Math.min(Math.max(value, min), max);
@@ -118,7 +96,15 @@ export function LearningAppScreen({
   const [generatedProblem, setGeneratedProblem] =
     useState<GeneratedProblem>(fallbackProblem);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isGrading, setIsGrading] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
+  const [manualAnswer, setManualAnswer] = useState('');
+  const [capturedAnswer, setCapturedAnswer] = useState<CapturedAnswer | null>(
+    null,
+  );
+  const [gradingResult, setGradingResult] = useState<GradingResult | null>(
+    null,
+  );
 
   const progress = useMemo(
     () => ({
@@ -143,12 +129,29 @@ export function LearningAppScreen({
     try {
       const nextProblem = await generateStudyProblem(apiConfig, generateRequest);
       setGeneratedProblem(nextProblem);
+      setCapturedAnswer(null);
+      setGradingResult(null);
+      setManualAnswer('');
       onGeneratedProblem?.(nextProblem);
       navigate('problem');
     } catch (caught) {
       setApiError(caught instanceof Error ? caught.message : String(caught));
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  const runGrade = async (answer: CapturedAnswer) => {
+    setCapturedAnswer(answer);
+    setIsGrading(true);
+    setGradingResult(null);
+    navigate('grading');
+    try {
+      const result = await gradeCapturedAnswer(generatedProblem, answer);
+      setGradingResult(result);
+      navigate(result.isCorrect ? 'correct' : 'wrong');
+    } finally {
+      setIsGrading(false);
     }
   };
 
@@ -176,13 +179,26 @@ export function LearningAppScreen({
           />
         );
       case 'camera':
-        return <CameraScreen onGrade={() => navigate('grading')} />;
+        return (
+          <CameraScreen
+            manualAnswer={manualAnswer}
+            onChangeManualAnswer={setManualAnswer}
+            onGrade={runGrade}
+          />
+        );
       case 'grading':
-        return <GradingScreen onDone={() => navigate('correct')} />;
+        return (
+          <GradingScreen
+            capturedAnswer={capturedAnswer}
+            gradingResult={gradingResult}
+            isGrading={isGrading}
+          />
+        );
       case 'correct':
         return (
           <CorrectScreen
             generatedProblem={generatedProblem}
+            gradingResult={gradingResult}
             mastered={preview.mastered}
             onNext={() => navigate('missionResult')}
             total={preview.total}
@@ -192,6 +208,7 @@ export function LearningAppScreen({
         return (
           <WrongScreen
             generatedProblem={generatedProblem}
+            gradingResult={gradingResult}
             onNext={() => navigate('retry')}
           />
         );
@@ -396,8 +413,19 @@ function ProblemScreen({
     <View style={styles.body}>
       <Dots total={10} active={3} current={4} />
       <View style={styles.problemCard}>
-        <Text style={styles.kicker}>{generatedProblem.title}</Text>
-        <Text style={styles.problemText}>{generatedProblem.problem}</Text>
+        <View style={styles.problemHeader}>
+          <Text style={styles.kicker}>{generatedProblem.title}</Text>
+          <Text style={styles.sourceBadge}>
+            {generatedProblem.source === 'api' ? 'API生成' : 'デモ問題'}
+          </Text>
+        </View>
+        <MathContent tone="problem" value={generatedProblem.problem} />
+        {generatedProblem.latex ? (
+          <View style={styles.latexBox}>
+            <Text style={styles.kicker}>LaTeX / MMD</Text>
+            <MathContent tone="compact" value={`$$${generatedProblem.latex}$$`} />
+          </View>
+        ) : null}
         <Text style={styles.smallText}>途中式もノートに書いて撮影してください。</Text>
       </View>
       <View style={styles.flexSpacer} />
@@ -411,49 +439,83 @@ function ProblemScreen({
   );
 }
 
-function CameraScreen({ onGrade }: { onGrade: () => void }) {
+function CameraScreen({
+  manualAnswer,
+  onChangeManualAnswer,
+  onGrade,
+}: {
+  manualAnswer: string;
+  onChangeManualAnswer: (value: string) => void;
+  onGrade: (answer: CapturedAnswer) => void;
+}) {
   return (
     <View style={styles.cameraScreen}>
-      <View style={styles.cameraFrame}>
-        <Text style={styles.cameraHint}>枠の中に解答用紙を合わせてください</Text>
+      <View style={styles.cameraTop}>
+        <Text style={styles.cameraHint}>紙の答案を撮影、または画像を選択してください。</Text>
+        <TextInput
+          multiline
+          onChangeText={onChangeManualAnswer}
+          placeholder="OCRが不完全な場合に備えて、答えや途中式を入力"
+          placeholderTextColor="#9aa1ad"
+          style={styles.answerInput}
+          value={manualAnswer}
+        />
       </View>
-      <View style={styles.cameraBar}>
-        <Text style={styles.cameraTool}>アルバム</Text>
-        <Pressable onPress={onGrade} style={styles.shutter} />
-        <Text style={styles.cameraTool}>ライト</Text>
-      </View>
+      <CameraCapture manualAnswer={manualAnswer} onCapture={onGrade} />
     </View>
   );
 }
 
-function GradingScreen({ onDone }: { onDone: () => void }) {
+function GradingScreen({
+  capturedAnswer,
+  gradingResult,
+  isGrading,
+}: {
+  capturedAnswer: CapturedAnswer | null;
+  gradingResult: GradingResult | null;
+  isGrading: boolean;
+}) {
   return (
     <View style={styles.body}>
-      <View style={styles.scanBox}>
-        <View style={styles.scanLine} />
-      </View>
-      <ActivityIndicator color="#4f46e5" />
-      <Text style={styles.centerTitle}>読み取っています...</Text>
-      <Text style={styles.centerText}>手書きの式を認識し、考え方を確認中です。</Text>
+      {capturedAnswer?.imageDataUrl ? (
+        <View style={styles.scanBox}>
+          <Text style={styles.scanImageLabel}>{capturedAnswer.imageName}</Text>
+          <View style={styles.scanLine} />
+        </View>
+      ) : (
+        <View style={styles.scanBox}>
+          <Text style={styles.scanImageLabel}>手動入力で採点</Text>
+          <View style={styles.scanLine} />
+        </View>
+      )}
+      {isGrading ? <ActivityIndicator color="#4f46e5" /> : null}
+      <Text style={styles.centerTitle}>
+        {isGrading ? 'AI採点しています...' : '採点結果を準備しました'}
+      </Text>
+      <Text style={styles.centerText}>
+        OCR候補、手動入力、模範解答を同じ採点サービス境界へ渡しています。
+      </Text>
       <GroupedRows
         rows={[
-          ['文字の認識', '完了'],
-          ['式の照合', '処理中'],
+          ['画像', capturedAnswer?.imageName ?? 'なし'],
+          ['OCR候補', capturedAnswer?.ocrText || '手動入力待ち'],
+          ['採点', gradingResult ? '完了' : '処理中'],
         ]}
       />
       <View style={styles.flexSpacer} />
-      <PrimaryButton label="採点結果を表示" onPress={onDone} />
     </View>
   );
 }
 
 function CorrectScreen({
   generatedProblem,
+  gradingResult,
   mastered,
   onNext,
   total,
 }: {
   generatedProblem: GeneratedProblem;
+  gradingResult: GradingResult | null;
   mastered: number;
   onNext: () => void;
   total: number;
@@ -462,12 +524,22 @@ function CorrectScreen({
     <View style={styles.body}>
       <Text style={styles.successTitle}>正解</Text>
       <View style={styles.problemCardSmall}>
-        <Text style={styles.kicker}>あなたの答え</Text>
-        <Text style={styles.problemText}>{generatedProblem.answer}</Text>
+        <Text style={styles.kicker}>認識した答え</Text>
+        <MathContent
+          tone="body"
+          value={gradingResult?.recognizedText ?? generatedProblem.answer}
+        />
       </View>
       <View style={[styles.strip, styles.okStrip]}>
-        <Text style={styles.stripTitle}>ポイント</Text>
-        <Text style={styles.bodyText}>{generatedProblem.explanation}</Text>
+        <Text style={styles.stripTitle}>AIフィードバック</Text>
+        <MathContent
+          tone="body"
+          value={gradingResult?.feedback ?? generatedProblem.explanation}
+        />
+      </View>
+      <View style={styles.problemCardSmall}>
+        <Text style={styles.kicker}>模範解説</Text>
+        <MathContent tone="body" value={generatedProblem.explanation} />
       </View>
       <Dots total={total} active={mastered + 1} />
       <Text style={styles.centerText}>正解 {mastered + 1} / あと {Math.max(8 - mastered - 1, 0)} 問</Text>
@@ -479,21 +551,33 @@ function CorrectScreen({
 
 function WrongScreen({
   generatedProblem,
+  gradingResult,
   onNext,
 }: {
   generatedProblem: GeneratedProblem;
+  gradingResult: GradingResult | null;
   onNext: () => void;
 }) {
   return (
     <View style={styles.body}>
       <Text style={styles.failTitle}>不正解</Text>
       <View style={[styles.strip, styles.badStrip]}>
-        <Text style={styles.stripTitle}>あなたの答え</Text>
-        <Text style={styles.bodyText}>符号または条件の読み落としがあります。</Text>
+        <Text style={styles.stripTitle}>認識した答え</Text>
+        <MathContent
+          tone="body"
+          value={gradingResult?.recognizedText ?? 'OCR結果なし'}
+        />
       </View>
       <View style={[styles.strip, styles.okStrip]}>
-        <Text style={styles.stripTitle}>正しい考え方</Text>
-        <Text style={styles.bodyText}>{generatedProblem.explanation}</Text>
+        <Text style={styles.stripTitle}>AIフィードバック</Text>
+        <MathContent
+          tone="body"
+          value={gradingResult?.feedback ?? generatedProblem.explanation}
+        />
+      </View>
+      <View style={styles.problemCardSmall}>
+        <Text style={styles.kicker}>模範解説</Text>
+        <MathContent tone="body" value={generatedProblem.explanation} />
       </View>
       <Text style={styles.smallText}>この問題はマスターするまで再び出題されます。</Text>
       <View style={styles.flexSpacer} />
@@ -745,6 +829,18 @@ const styles = StyleSheet.create({
   badStrip: {
     backgroundColor: '#fae6e6',
   },
+  answerInput: {
+    backgroundColor: '#ffffff',
+    borderColor: '#d8dbe4',
+    borderRadius: 10,
+    borderWidth: 1,
+    color: '#1b1e26',
+    fontSize: 14,
+    minHeight: 76,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    textAlignVertical: 'top',
+  },
   bigTime: {
     color: '#1b1e26',
     fontFamily: mono,
@@ -804,42 +900,19 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '800',
   },
-  cameraBar: {
-    alignItems: 'center',
-    backgroundColor: '#11131a',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingBottom: 26,
-    paddingHorizontal: 32,
-    paddingTop: 18,
-  },
-  cameraFrame: {
-    alignItems: 'center',
-    borderColor: 'rgba(255,255,255,0.55)',
-    borderRadius: 12,
-    borderStyle: 'dashed',
-    borderWidth: 2,
-    flex: 1,
-    justifyContent: 'center',
-    margin: 24,
-  },
   cameraHint: {
-    color: '#ffffff',
-    fontSize: 14,
+    color: '#c9ced8',
+    fontSize: 12,
     fontWeight: '700',
-    maxWidth: 190,
-    textAlign: 'center',
+    lineHeight: 18,
   },
   cameraScreen: {
     backgroundColor: '#1b1d24',
     flex: 1,
   },
-  cameraTool: {
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: '700',
-    opacity: 0.82,
-    width: 62,
+  cameraTop: {
+    gap: 10,
+    padding: 14,
   },
   centerText: {
     color: '#596171',
@@ -923,6 +996,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     gap: 4,
     padding: 16,
+  },
+  latexBox: {
+    gap: 8,
   },
   inlineApi: {
     backgroundColor: '#eceafe',
@@ -1047,11 +1123,11 @@ const styles = StyleSheet.create({
     gap: 8,
     padding: 16,
   },
-  problemText: {
-    color: '#1b1e26',
-    fontSize: 20,
-    fontWeight: '800',
-    lineHeight: 30,
+  problemHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'space-between',
   },
   ring: {
     alignSelf: 'center',
@@ -1113,17 +1189,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     overflow: 'hidden',
   },
+  scanImageLabel: {
+    color: '#596171',
+    fontSize: 12,
+    fontWeight: '800',
+    paddingHorizontal: 12,
+    paddingTop: 12,
+  },
   scanLine: {
     backgroundColor: '#4f46e5',
     height: 2,
-  },
-  shutter: {
-    backgroundColor: '#ffffff',
-    borderColor: 'rgba(255,255,255,0.45)',
-    borderRadius: 30,
-    borderWidth: 5,
-    height: 60,
-    width: 60,
   },
   smallText: {
     color: '#6b7280',
@@ -1146,6 +1221,15 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     gap: 4,
     padding: 14,
+  },
+  sourceBadge: {
+    backgroundColor: '#eceafe',
+    borderRadius: 999,
+    color: '#3730a3',
+    fontSize: 11,
+    fontWeight: '900',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
   },
   statusText: {
     color: '#1b1e26',

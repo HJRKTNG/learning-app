@@ -1,0 +1,84 @@
+.camera-capture {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.camera-view {
+  position: relative;
+  flex: 1;
+  min-height: 280px;
+  overflow: hidden;
+  background: #1b1d24;
+}
+
+.camera-video,
+.camera-preview {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.camera-frame {
+  position: absolute;
+  inset: 28px 20px;
+  display: grid;
+  place-items: center;
+  border: 2px dashed rgba(255, 255, 255, 0.62);
+  border-radius: 12px;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 800;
+  text-align: center;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
+}
+
+.camera-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 24px 20px;
+  background: #11131a;
+}
+
+.camera-file-button {
+  display: grid;
+  width: 82px;
+  min-height: 42px;
+  place-items: center;
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+  opacity: 0.86;
+}
+
+.camera-file-button input {
+  display: none;
+}
+
+.camera-shutter {
+  width: 64px;
+  height: 64px;
+  border: 5px solid rgba(255, 255, 255, 0.45);
+  border-radius: 50%;
+  background: #ffffff;
+  color: #11131a;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.camera-error {
+  margin: 0;
+  padding: 8px 14px;
+  background: #fae6e6;
+  color: #a83232;
+  font-size: 12px;
+}
+
+.camera-canvas {
+  display: none;
+}

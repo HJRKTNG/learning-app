@@ -13,9 +13,9 @@ import {
   LearningAppScreen,
   LearningPreviewState,
   LearningScreenId,
-  learningScreenOptions,
 } from './LearningAppScreen';
 import { GeneratedProblem, GenerateProblemRequest } from '../api/genStudyApi';
+import { learningScreenOptions } from './learningScreenOptions';
 
 const defaultApiUrl =
   globalThis.__GEN_STUDY_API_URL__ ??
@@ -38,8 +38,19 @@ const initialRequest: GenerateProblemRequest = {
   topic: 'Probability Recurrence Relations',
 };
 
+const initialScreenFromUrl = (): LearningScreenId => {
+  const requested = new URLSearchParams(globalThis.location?.search).get(
+    'screen',
+  );
+  const match = learningScreenOptions.find(option => option.id === requested);
+  return match?.id ?? 'home';
+};
+
 export function DevBrowserShell() {
-  const [preview, setPreview] = useState<LearningPreviewState>(initialPreview);
+  const [preview, setPreview] = useState<LearningPreviewState>({
+    ...initialPreview,
+    screen: initialScreenFromUrl(),
+  });
   const [apiUrl, setApiUrl] = useState(defaultApiUrl);
   const [apiToken, setApiToken] = useState(defaultApiToken);
   const [request, setRequest] = useState<GenerateProblemRequest>(initialRequest);
@@ -164,6 +175,13 @@ export function DevBrowserShell() {
           />
           <Text style={styles.hint}>
             Tokenは `.env.local` の `VITE_GEN_STUDY_API_TOKEN` でも指定できます。
+          </Text>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>OCR / AI採点</Text>
+          <Text style={styles.copy}>
+            紙答案はブラウザで撮影またはアップロードできます。現在は手動入力をOCR候補としてローカルAIシミュレーターに渡し、将来はMathpixなどのSTEM OCRとAI採点APIへ差し替えます。
           </Text>
         </View>
 

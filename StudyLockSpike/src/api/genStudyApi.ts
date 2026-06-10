@@ -14,12 +14,31 @@ export type GeneratedProblem = {
   problem: string;
   answer: string;
   explanation: string;
+  latex?: string;
+  source: 'api' | 'fallback';
   raw: unknown;
 };
 
 const textFrom = (value: unknown): string | undefined => {
   if (typeof value === 'string' && value.trim().length > 0) {
     return value.trim();
+  }
+  if (Array.isArray(value)) {
+    const joined = value
+      .map(item => textFrom(item))
+      .filter(Boolean)
+      .join('\n\n');
+    return joined.length > 0 ? joined : undefined;
+  }
+  if (value && typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    return (
+      textFrom(record.text) ??
+      textFrom(record.markdown) ??
+      textFrom(record.latex) ??
+      textFrom(record.content) ??
+      textFrom(record.value)
+    );
   }
   return undefined;
 };
@@ -46,25 +65,74 @@ const normalizeGeneratedProblem = (json: unknown): GeneratedProblem => {
       : root.result && typeof root.result === 'object'
         ? (root.result as Record<string, unknown>)
         : root;
+  const problemText =
+    pickText(nested, [
+      'problem',
+      'question',
+      'prompt',
+      'content',
+      'statement',
+      'body',
+      'problem_text',
+    ]) ??
+    pickText(root, [
+      'problem',
+      'question',
+      'prompt',
+      'content',
+      'statement',
+      'body',
+      'problem_text',
+    ]) ??
+    JSON.stringify(json, null, 2);
+  const answerText =
+    pickText(nested, [
+      'answer',
+      'final_answer',
+      'correct_answer',
+      'solution_answer',
+      'result',
+    ]) ??
+    pickText(root, [
+      'answer',
+      'final_answer',
+      'correct_answer',
+      'solution_answer',
+      'result',
+    ]) ??
+    '未取得';
+  const explanationText =
+    pickText(nested, [
+      'explanation',
+      'solution',
+      'reasoning',
+      'commentary',
+      'steps',
+      '解説',
+    ]) ??
+    pickText(root, [
+      'explanation',
+      'solution',
+      'reasoning',
+      'commentary',
+      'steps',
+      '解説',
+    ]) ??
+    '解説フィールドはAPIレスポンスから自動判別できませんでした。';
 
   return {
     title:
-      pickText(nested, ['title', 'topic', 'name']) ??
-      pickText(root, ['title', 'topic', 'name']) ??
+      pickText(nested, ['title', 'topic', 'name', 'unit']) ??
+      pickText(root, ['title', 'topic', 'name', 'unit']) ??
       '生成された問題',
-    problem:
-      pickText(nested, ['problem', 'question', 'prompt', 'content']) ??
-      pickText(root, ['problem', 'question', 'prompt', 'content']) ??
-      JSON.stringify(json, null, 2),
-    answer:
-      pickText(nested, ['answer', 'final_answer', 'correct_answer']) ??
-      pickText(root, ['answer', 'final_answer', 'correct_answer']) ??
-      '未取得',
-    explanation:
-      pickText(nested, ['explanation', 'solution', 'reasoning', 'commentary']) ??
-      pickText(root, ['explanation', 'solution', 'reasoning', 'commentary']) ??
-      '解説フィールドはAPIレスポンスから自動判別できませんでした。',
+    problem: problemText,
+    answer: answerText,
+    explanation: explanationText,
+    latex:
+      pickText(nested, ['latex', 'tex', 'math', 'mmd']) ??
+      pickText(root, ['latex', 'tex', 'math', 'mmd']),
     raw: json,
+    source: 'api',
   };
 };
 

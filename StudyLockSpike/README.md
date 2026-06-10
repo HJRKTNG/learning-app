@@ -31,6 +31,8 @@ npm run web
 ```sh
 VITE_GEN_STUDY_API_URL=https://gen-study-api.onrender.com/generate
 VITE_GEN_STUDY_API_TOKEN=your_local_token
+VITE_OCR_API_URL=
+VITE_GRADING_API_URL=
 ```
 
 現在のデフォルト生成リクエストは次の内容です。
@@ -44,6 +46,14 @@ VITE_GEN_STUDY_API_TOKEN=your_local_token
 ```
 
 APIの応答は問題画面に反映されます。外部APIの生成には時間がかかる場合があります。
+
+### TeX表示・撮影・AI採点の設計
+
+- 生成問題の問題文、解答、解説、LaTeX/MMDは `GeneratedProblem` に正規化してから表示します。
+- WebプレビューではKaTeXでTeXを整形表示します。ネイティブ側は読みやすいテキスト表示へフォールバックします。
+- ブラウザではカメラ撮影、画像アップロード、手動入力を使って答案を作れます。
+- 現在の採点は `GradingService` のローカルAIシミュレーターです。OCR/AI採点APIが決まったら、UIを触らずにサービス内部を差し替えます。
+- 手描き数学OCRの検討メモは [docs/CCSDD-LearningWorkflow.md](docs/CCSDD-LearningWorkflow.md) にまとめています。
 
 # Getting Started
 
