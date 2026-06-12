@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>学習アプリ ワイヤーフロー</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Kalam:wght@400;700&family=Klee+One:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#1f2430;
+    --ink-soft:#5b6472;
+    --line:#aab2c0;
+    --line-soft:#cdd4df;
+    --paper:#eef0f4;
+    --card:#ffffff;
+    --accent:#4f46e5;
+    --accent-soft:#e0e7ff;
+    --accent-ink:#3730a3;
+    --ok:#0f9d58;
+    --ok-soft:#dcf3e6;
+    --warn:#d9822b;
+    --warn-soft:#fbedd9;
+    --muted:#9aa3b2;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:'Klee One','Kalam',cursive;
+    background:var(--paper);
+    color:var(--ink);
+    background-image:radial-gradient(var(--line-soft) 1px, transparent 1px);
+    background-size:22px 22px;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1480px;margin:0 auto;padding:48px 40px 120px;}
+
+  /* ---- header ---- */
+  header.top{margin-bottom:40px;}
+  .kicker{font-family:'Kalam',cursive;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);font-size:14px;}
+  h1{font-size:40px;margin:6px 0 0;font-weight:600;letter-spacing:.01em;}
+  .sub{color:var(--ink-soft);font-size:17px;margin-top:10px;max-width:760px;line-height:1.7;}
+
+  .note{
+    margin-top:26px;background:var(--card);border:2px solid var(--ink);
+    border-radius:14px;padding:20px 24px;max-width:860px;
+    box-shadow:5px 5px 0 rgba(31,36,48,.08);
+  }
+  .note h3{margin:0 0 8px;font-size:16px;font-family:'Kalam',cursive;font-weight:700;}
+  .note ul{margin:0;padding-left:20px;color:var(--ink-soft);line-height:1.85;font-size:15px;}
+  .note b{color:var(--accent-ink);}
+
+  /* ---- legend ---- */
+  .legend{display:flex;flex-wrap:wrap;gap:10px 22px;margin-top:24px;align-items:center;font-size:14px;color:var(--ink-soft);}
+  .legend .item{display:flex;align-items:center;gap:8px;}
+  .sw{width:26px;height:16px;border-radius:5px;border:2px solid var(--ink);}
+  .sw.s-accent{background:var(--accent-soft);border-color:var(--accent);}
+  .sw.s-ok{background:var(--ok-soft);border-color:var(--ok);}
+  .sw.s-warn{background:var(--warn-soft);border-color:var(--warn);}
+  .sw.s-ph{background:repeating-linear-gradient(135deg,#fff,#fff 4px,var(--line-soft) 4px,var(--line-soft) 7px);}
+
+  /* ---- section ---- */
+  section.phase{margin-top:64px;}
+  .phase-head{display:flex;align-items:baseline;gap:16px;margin-bottom:10px;}
+  .phase-num{
+    font-family:'Kalam',cursive;font-weight:700;font-size:15px;color:#fff;background:var(--ink);
+    border-radius:999px;padding:4px 14px;letter-spacing:.04em;
+  }
+  .phase-head h2{font-size:26px;margin:0;font-weight:600;}
+  .phase-desc{color:var(--ink-soft);font-size:15px;margin:0 0 28px;}
+
+  /* ---- flow row ---- */
+  .flow{display:flex;align-items:flex-start;gap:0;flex-wrap:wrap;}
+  .frame-wrap{display:flex;flex-direction:column;align-items:center;gap:12px;}
+  .frame-cap{font-family:'Kalam',cursive;font-weight:700;font-size:15px;color:var(--ink);text-align:center;}
+  .frame-cap small{display:block;font-family:'Klee One',cursive;font-weight:400;font-size:12.5px;color:var(--muted);margin-top:2px;}
+
+  /* ---- connector ---- */
+  .conn{display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:96px;align-self:center;padding:0 6px;gap:7px;}
+  .conn .lbl{
+    font-family:'Kalam',cursive;font-weight:700;font-size:12px;color:var(--accent-ink);
+    background:var(--accent-soft);border:1.5px solid var(--accent);border-radius:999px;
+    padding:3px 10px;white-space:nowrap;transform:rotate(-2deg);
+  }
+  .arrow{width:64px;height:20px;}
+  .arrow path{stroke:var(--ink);stroke-width:2.4;fill:none;stroke-linecap:round;}
+  .arrow polygon{fill:var(--ink);}
+
+  /* ---- phone ---- */
+  .phone{
+    width:266px;height:548px;background:var(--card);border:2.5px solid var(--ink);
+    border-radius:34px;padding:11px;position:relative;
+    box-shadow:6px 7px 0 rgba(31,36,48,.10);
+  }
+  .phone::before{content:"";position:absolute;top:14px;left:50%;transform:translateX(-50%);
+    width:74px;height:18px;background:var(--ink);border-radius:999px;z-index:5;}
+  .screen{width:100%;height:100%;border:1.5px solid var(--line-soft);border-radius:25px;overflow:hidden;
+    display:flex;flex-direction:column;background:#fff;}
+  .scr-lock{background:#f6f7fb;}
+  .statusbar{height:34px;display:flex;align-items:center;justify-content:space-between;padding:0 18px 0 20px;
+    font-family:'Kalam',cursive;font-weight:700;font-size:12px;color:var(--ink);flex:0 0 auto;}
+  .statusbar .dots{display:flex;gap:3px;align-items:center;}
+  .statusbar .dots i{width:5px;height:5px;border-radius:50%;background:var(--ink);display:block;}
+  .statusbar .batt{width:18px;height:9px;border:1.5px solid var(--ink);border-radius:2px;position:relative;}
+  .statusbar .batt::after{content:"";position:absolute;right:-3px;top:2px;width:2px;height:3px;background:var(--ink);border-radius:0 1px 1px 0;}
+  .body{flex:1;padding:14px 16px;display:flex;flex-direction:column;gap:11px;overflow:hidden;}
+
+  /* wireframe primitives */
+  .pill{font-family:'Kalam',cursive;font-weight:700;font-size:10.5px;letter-spacing:.04em;padding:3px 9px;border-radius:999px;display:inline-block;border:1.5px solid var(--ink);}
+  .pill.free{background:#fff;color:var(--ink-soft);border-color:var(--line);}
+  .pill.lock{background:var(--ink);color:#fff;border-color:var(--ink);}
+  .pill.ok{background:var(--ok-soft);color:#0a6e3f;border-color:var(--ok);}
+  .pill.warn{background:var(--warn-soft);color:#9a5410;border-color:var(--warn);}
+
+  .h-line{font-size:18px;font-weight:600;line-height:1.35;letter-spacing:.01em;}
+  .h-line.big{font-size:23px;}
+  .t-line{font-size:13px;color:var(--ink-soft);line-height:1.55;}
+  .t-mini{font-size:11.5px;color:var(--muted);}
+
+  .bar{height:9px;border-radius:5px;background:repeating-linear-gradient(135deg,#fff,#fff 4px,var(--line-soft) 4px,var(--line-soft) 7px);border:1.5px solid var(--line);}
+  .bar.s{width:55%;} .bar.m{width:78%;} .bar.l{width:100%;}
+
+  .box{border:1.5px solid var(--line);border-radius:10px;background:#fbfcfe;padding:11px 12px;display:flex;flex-direction:column;gap:8px;}
+  .box.dash{border-style:dashed;}
+  .box.accent{border-color:var(--accent);background:var(--accent-soft);}
+  .box.okb{border-color:var(--ok);background:var(--ok-soft);}
+  .box.warnb{border-color:var(--warn);background:var(--warn-soft);}
+
+  .btn{border:2px solid var(--accent);background:var(--accent);color:#fff;border-radius:11px;text-align:center;
+    font-family:'Kalam',cursive;font-weight:700;font-size:14px;padding:11px;letter-spacing:.02em;}
+  .btn.ghost{background:#fff;color:var(--accent-ink);}
+  .btn.ink{background:var(--ink);border-color:var(--ink);}
+  .btn.dim{background:#eef0f4;border-color:var(--line);color:var(--muted);}
+  .spacer{flex:1;}
+
+  .ring{width:96px;height:96px;border-radius:50%;border:7px solid var(--line-soft);border-top-color:var(--accent);
+    border-right-color:var(--accent);display:flex;align-items:center;justify-content:center;margin:2px auto;
+    transform:rotate(35deg);}
+  .ring span{transform:rotate(-35deg);font-family:'Kalam',cursive;font-weight:700;font-size:22px;color:var(--ink);}
+  .ring.okr{border-color:var(--ok-soft);border-top-color:var(--ok);border-right-color:var(--ok);}
+
+  .lockglyph{width:54px;height:60px;margin:6px auto 2px;}
+  .lockglyph path,.lockglyph rect{stroke:var(--ink);stroke-width:2.6;fill:none;}
+  .lockglyph rect.fill{fill:#fff;}
+
+  .count{font-family:'Kalam',cursive;font-weight:700;font-size:30px;color:var(--accent-ink);letter-spacing:.02em;}
+
+  .prog{display:flex;gap:4px;}
+  .prog i{flex:1;height:7px;border-radius:4px;background:var(--line-soft);}
+  .prog i.on{background:var(--accent);}
+  .prog i.bad{background:var(--warn);}
+
+  .cam{flex:1;border:1.5px dashed var(--line);border-radius:12px;background:#f3f5f9;position:relative;display:flex;align-items:center;justify-content:center;}
+  .cam .guide{position:absolute;inset:18px;border:2px dashed var(--accent);border-radius:8px;}
+  .cam .gtxt{font-family:'Kalam',cursive;font-weight:700;font-size:12px;color:var(--accent-ink);position:relative;text-align:center;}
+  .shutter{width:50px;height:50px;border-radius:50%;border:3px solid var(--ink);background:#fff;margin:0 auto;position:relative;}
+  .shutter::after{content:"";position:absolute;inset:5px;border-radius:50%;background:var(--ink);}
+  .camrow{display:flex;align-items:center;justify-content:space-between;padding:0 6px;}
+
+  .qnum{font-family:'Kalam',cursive;font-weight:700;font-size:13px;color:var(--accent-ink);}
+  .formula{font-size:19px;color:var(--ink);font-weight:600;letter-spacing:.02em;}
+
+  .branch-tag{font-family:'Kalam',cursive;font-weight:700;font-size:13px;color:var(--ink);background:#fff;border:2px solid var(--ink);
+    border-radius:999px;padding:5px 14px;box-shadow:3px 3px 0 rgba(31,36,48,.08);}
+
+  /* state machine map */
+  .map{background:var(--card);border:2px solid var(--ink);border-radius:18px;padding:30px 28px 26px;box-shadow:6px 6px 0 rgba(31,36,48,.08);overflow-x:auto;}
+  .map h3{margin:0 0 22px;font-family:'Kalam',cursive;font-weight:700;font-size:18px;}
+  .states{display:flex;align-items:center;gap:0;min-width:980px;}
+  .st{border:2px solid var(--ink);border-radius:13px;padding:13px 16px;text-align:center;min-width:128px;background:#fff;}
+  .st .nm{font-weight:600;font-size:15px;}
+  .st .dt{font-size:11.5px;color:var(--muted);margin-top:3px;font-family:'Klee One',cursive;}
+  .st.s-free{background:#fff;} .st.s-lock{background:var(--accent-soft);border-color:var(--accent);}
+  .st.s-pass{background:var(--ok-soft);border-color:var(--ok);} .st.s-fail{background:var(--warn-soft);border-color:var(--warn);}
+  .marrow{display:flex;flex-direction:column;align-items:center;min-width:74px;padding:0 4px;gap:5px;}
+  .marrow .lbl{font-family:'Kalam',cursive;font-weight:700;font-size:11px;color:var(--accent-ink);white-space:nowrap;}
+  .marrow svg{width:48px;height:16px;}
+  .marrow path{stroke:var(--ink);stroke-width:2.4;fill:none;stroke-linecap:round;}
+  .marrow polygon{fill:var(--ink);}
+  .loopnote{margin-top:18px;font-size:13.5px;color:var(--ink-soft);display:flex;gap:18px;flex-wrap:wrap;}
+  .loopnote b{color:var(--warn);} .loopnote .g b{color:var(--ok);}
+
+  .footer-note{margin-top:70px;border-top:2px dashed var(--line);padding-top:28px;}
+  .footer-note h3{font-family:'Kalam',cursive;font-weight:700;font-size:18px;margin:0 0 12px;}
+  .footer-note ol{color:var(--ink-soft);line-height:1.9;font-size:15px;max-width:820px;padding-left:22px;margin:0;}
+
+  @media(max-width:900px){.wrap{padding:30px 18px 90px;}h1{font-size:30px;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div class="kicker">Wireflow / 低忠実度</div>
+    <h1>学習アプリ — 画面遷移とワイヤーフロー</h1>
+    <p class="sub">「毎日16:00に対象アプリをロック → 数学ミッション（10問中8問正解）で解除 → 翌日16:00まで自由利用」という制御を、状態と遷移として整理したラフ案です。まだ作り込みではなく、<b>構造と分岐を固める</b>のが目的です。</p>
+
+    <div class="note">
+      <h3>この段階での前提・設計判断</h3>
+      <ul>
+        <li>状態は大きく <b>自由（16:00前）</b> / <b>制限中（学習）</b> / <b>解除済み</b> の3つ。</li>
+        <li>合格ライン = <b>10問中8問正解（正答率80%）</b>。初回で未達でも、<b>間違えた問題の再挑戦で累計8問</b>に到達すれば解除。</li>
+        <li>解答は紙に書く前提 → <b>撮影 → OCR → AI採点</b> の1問フローを軸にしています。</li>
+        <li>教科は数学中心ですが、ミッションの器は他教科にも流用できる構造にしています。</li>
+        <li>※ ビジュアルは最終形ではありません。レイアウト・遷移・情報量の確認用です。</li>
+      </ul>
+    </div>
+
+    <div class="legend">
+      <span class="item"><span class="sw s-ph"></span>プレースホルダ（本文・画像）</span>
+      <span class="item"><span class="sw s-accent"></span>主要アクション / 強調</span>
+      <span class="item"><span class="sw s-ok"></span>合格・解除</span>
+      <span class="item"><span class="sw s-warn"></span>未達・再挑戦</span>
+    </div>
+  </header>
+
+  <!-- ============ STATE MAP ============ -->
+  <div class="map">
+    <h3>① 状態遷移マップ（1日のサイクル）</h3>
+    <div class="states">
+      <div class="st s-free"><div class="nm">自由</div><div class="dt">16:00前</div></div>
+      <div class="marrow"><span class="lbl">16:00 到達</span><svg viewBox="0 0 48 16"><path d="M2 8 H40"/><polygon points="40,2 48,8 40,14"/></svg></div>
+      <div class="st s-lock"><div class="nm">制限中</div><div class="dt">対象アプリをロック</div></div>
+      <div class="marrow"><span class="lbl">問題を解く</span><svg viewBox="0 0 48 16"><path d="M2 8 H40"/><polygon points="40,2 48,8 40,14"/></svg></div>
+      <div class="st s-lock"><div class="nm">学習・採点</div><div class="dt">撮影→AI採点</div></div>
+      <div class="marrow"><span class="lbl">全問完了</span><svg viewBox="0 0 48 16"><path d="M2 8 H40"/><polygon points="40,2 48,8 40,14"/></svg></div>
+      <div class="st s-pass"><div class="nm">判定</div><div class="dt">累計8問正解？</div></div>
+      <div class="marrow"><span class="lbl">YES → 解除</span><svg viewBox="0 0 48 16"><path d="M2 8 H40"/><polygon points="40,2 48,8 40,14"/></svg></div>
+      <div class="st s-pass"><div class="nm">解除済み</div><div class="dt">翌日16:00まで</div></div>
+    </div>
+    <div class="loopnote">
+      <span><b>NO（8問未満）</b> → 間違えた問題で「再挑戦」を生成し、判定の前に戻る（累計8問到達まで）。</span>
+      <span class="g">解除済みは <b>翌日16:00</b> に再びロックへ戻り、サイクルが1周します。</span>
+    </div>
+  </div>
+
+  <!-- ============ PHASE 1 ============ -->
+  <section class="phase">
+    <div class="phase-head"><span class="phase-num">PHASE 1</span><h2>自由状態 → ロック開始</h2></div>
+    <p class="phase-desc">16:00までは普段どおり。締切が近づくと予告し、16:00ちょうどに当日のミッションを生成してロックします。</p>
+    <div class="flow">
+
+      <div class="frame-wrap">
+        <div class="phone"><div class="screen">
+          <div class="statusbar"><span>13:58</span><span class="dots"><i></i><i></i><i></i><span class="batt"></span></span></div>
+          <div class="body">
+            <span class="pill free">自由に利用中</span>
+            <div class="h-line">こんにちは 👋</div>
+            <div class="box dash">
+              <div class="t-mini">次の学習制限まで</div>
+              <div class="count">あと 2:02</div>
+              <div class="t-line">16:00 から今日の数学ミッションが始まります</div>
+            </div>
+            <div class="box">
+              <div class="t-mini">今日の予定</div>
+              <div class="bar l"></div><div class="bar m"></div>
+            </div>
+            <div class="spacer"></div>
+            <div class="btn ghost">今日の範囲を先に見る</div>
+          </div>
+        </div></div>
+        <div class="frame-cap">ホーム（自由状態）<small>16:00前・カウントダウン</small></div>
+      </div>
+
+      <div class="conn"><span class="lbl">16:00 到達</span><svg class="arrow" viewBox="0 0 64 20"><path d="M2 10 H54"/><polygon points="54,3 64,10 54,17"/></svg></div>
+
+      <div class="frame-wrap">
+        <div class="phone"><div class="screen scr-lock">
+          <div class="statusbar"><span>16:00</span><span class="dots"><i></i><i></i><i></i><span class="batt"></span></span></div>
+          <div class="body" style="text-align:center;align-items:center;">
+            <svg class="lockglyph" viewBox="0 0 54 60"><rect class="fill" x="8" y="26" width="38" height="30" rx="6"/><path d="M16 26 V18 a11 11 0 0 1 22 0 V26"/></svg>
+            <div class="h-line big">学習ミッション開始</div>
+            <div class="t-line">SNS・動画・ゲームを一時的にロックしました</div>
+            <div class="box accent" style="width:100%;">
+              <div style="font-family:'Kalam';font-weight:700;font-size:15px;color:var(--accent-ink);">今日の数学ミッション</div>
+              <div class="t-line" style="color:var(--accent-ink);">全 10 問 ／ <b>8 問以上正解で解除</b></div>
+            </div>
+            <div class="spacer"></div>
+            <div class="btn" style="width:100%;">ミッションを開始する</div>
+          </div>
+        </div></div>
+        <div class="frame-cap">ロック通知画面<small>16:00 直後にフルスクリーン</small></div>
+      </div>
+
+      <div class="conn"><span class="lbl">開始する</span><svg class="arrow" viewBox="0 0 64 20"><path d="M2 10 H54"/><polygon points="54,3 64,10 54,17"/></svg></div>
+
+      <div class="frame-wrap">
+        <div class="phone"><div class="screen">
+          <div class="statusbar"><span>16:01</span><span class="dots"><i></i><i></i><i></i><span class="batt"></span></span></div>
+          <div class="body">
+            <span class="pill lock">制限中・ミッション</span>
+            <div class="h-line">二次関数 ミッション</div>
+            <div class="box">
+              <div class="t-mini">進捗</div>
+              <div class="prog"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+              <div class="t-line"><b>0 / 10</b> 問　正解 0 ／ 必要 8</div>
+            </div>
+            <div class="box dash"><div class="t-mini">解除すると…</div><div class="t-line">対象アプリが翌日16:00まで使えます</div></div>
+            <div class="spacer"></div>
+            <div class="btn ink">問題を始める</div>
+          </div>
+        </div></div>
+        <div class="frame-cap">ホーム（制限中）<small>ミッション進捗ハブ</small></div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============ PHASE 2 ============ -->
+  <section class="phase">
+    <div class="phase-head"><span class="phase-num">PHASE 2</span><h2>1問ごとの学習セッション（繰り返し）</h2></div>
+    <p class="phase-desc">「問題を読む → 紙で解く → 撮影 → OCR・AI採点 → フィードバック」を1問ずつ。10問終わるまでループします。</p>
+    <div class="flow">
+
+      <div class="frame-wrap">
+        <div class="phone"><div class="screen">
+          <div class="statusbar"><span>16:08</span><span class="dots"><i></i><i></i><i></i><span class="batt"></span></span></div>
+          <div class="body">
+            <div class="camrow"><span class="qnum">問題 3 / 10</span><span class="pill free">ヒント</span></div>
+            <div class="prog"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+            <div class="box" style="flex:1;">
+              <div class="t-mini">問題</div>
+              <div class="formula">y = x² − 4x + 3 の</div>
+              <div class="formula">頂点の座標を求めよ。</div>
+              <div class="bar m"></div>
+            </div>
+            <div class="btn">解答を撮影する</div>
+            <div class="btn ghost">ヒントを見る</div>
+          </div>
+        </div></div>
+        <div class="frame-cap">問題画面<small>問題文・番号・ヒント</small></div>
+      </div>
+
+      <div class="conn"><span class="lbl">撮影する</span><svg class="arrow" viewBox="0 0 64 20"><path d="M2 10 H54"/><polygon points="54,3 64,10 54,17"/></svg></div>
+
+      <div class="frame-wrap">
+        <div class="phone"><div class="screen scr-lock">
+          <div class="statusbar"><span>16:09</span><span class="dots"><i></i><i></i><i></i><span class="batt"></span></span></div>
+          <div class="body">
+            <div class="qnum">ノートを撮影</div>
+            <div class="cam"><div class="guide"></div><div class="gtxt">枠に解答用紙を<br>合わせてください</div></div>
+            <div class="camrow"><span class="pill free">再撮影</span><div class="shutter"></div><span class="pill free">ライト</span></div>
+          </div>
+        </div></div>
+        <div class="frame-cap">撮影画面<small>カメラ・枠ガイド</small></div>
+      </div>
+
+      <div class="conn"><span class="lbl">OCR → AI採点</span><svg class="arrow" viewBox="0 0 64 20"><path d="M2 10 H54"/><polygon points="54,3 64,10 54,17"/></svg></div>
+
+      <div class="frame-wrap">
+        <div class="phone"><div class="screen">
+          <div class="statusbar"><span>16:09</span><span class="dots"><i></i><i></i><i></i><span class="batt"></span></span></div>
+          <div class="body" style="align-items:center;text-align:center;">
+            <span class="pill ok">正解！</span>
+            <div class="ring okr"><span>3/10</span></div>
+            <div class="box okb" style="width:100%;text-align:left;">
+              <div class="t-mini">フィードバック</div>
+              <div class="t-line">頂点 (2, −1)。平方完成の式変形も合っています。</div>
+            </div>
+            <div class="t-line">正解 <b>3</b> ／ あと <b>5</b> 問で解除</div>
+            <div class="spacer"></div>
+            <div class="btn" style="width:100%;">次の問題へ</div>
+          </div>
+        </div></div>
+        <div class="frame-cap">採点結果画面<small>正誤・フィードバック・進捗</small></div>
+      </div>
+
+      <div class="conn"><span class="lbl">10問まで<br>繰り返し</span><svg class="arrow" viewBox="0 0 64 20"><path d="M2 10 C20 -6 44 -6 60 8 M2 10 H54" style="stroke-dasharray:4 4;"/><polygon points="54,3 64,10 54,17"/></svg></div>
+
+    </div>
+  </section>
+
+  <!-- ============ PHASE 3 ============ -->
+  <section class="phase">
+    <div class="phase-head"><span class="phase-num">PHASE 3</span><h2>判定 → 解除 ／ 再挑戦</h2></div>
+    <p class="phase-desc">10問終わったら合否判定。8問以上で即解除。未達なら間違えた問題で再挑戦し、累計8問に届いた瞬間に解除します。</p>
+    <div class="flow">
+
+      <div class="frame-wrap">
+        <div class="phone"><div class="screen">
+          <div class="statusbar"><span>16:42</span><span class="dots"><i></i><i></i><i></i><span class="batt"></span></span></div>
+          <div class="body" style="align-items:center;text-align:center;">
+            <span class="pill warn">あと一歩</span>
+            <div class="ring"><span>6/10</span></div>
+            <div class="h-line">正答率 60%</div>
+            <div class="box warnb" style="width:100%;text-align:left;">
+              <div class="t-line">解除まであと <b>2 問</b>。間違えた 4 問から再挑戦します。</div>
+            </div>
+            <div class="prog"><i class="on"></i><i class="on"></i><i class="on"></i><i class="bad"></i><i class="on"></i><i class="bad"></i><i class="on"></i><i class="bad"></i><i class="on"></i><i class="bad"></i></div>
+            <div class="spacer"></div>
+            <div class="btn ink" style="width:100%;">再挑戦に進む</div>
+          </div>
+        </div></div>
+        <div class="frame-cap">ミッション結果画面<small>合否・正答率</small></div>
+      </div>
+
+      <div class="conn"><span class="lbl">未達 → 再挑戦</span><svg class="arrow" viewBox="0 0 64 20"><path d="M2 10 H54"/><polygon points="54,3 64,10 54,17"/></svg></div>
+
+      <div class="frame-wrap">
+        <div class="phone"><div class="screen">
+          <div class="statusbar"><span>16:43</span><span class="dots"><i></i><i></i><i></i><span class="batt"></span></span></div>
+          <div class="body">
+            <span class="pill warn">再挑戦セット</span>
+            <div class="h-line">間違えた問題に挑戦</div>
+            <div class="box">
+              <div class="t-mini">残り</div>
+              <div class="t-line"><b>4 問</b> 中 <b>2 問</b> 正解で解除（累計8問）</div>
+              <div class="prog"><i class="bad"></i><i class="bad"></i><i class="bad"></i><i class="bad"></i></div>
+            </div>
+            <div class="box dash"><div class="t-mini">出題</div><div class="t-line">間違えた問題と同じ単元の類題</div></div>
+            <div class="spacer"></div>
+            <div class="btn">再挑戦を始める</div>
+          </div>
+        </div></div>
+        <div class="frame-cap">再挑戦画面<small>不正解ベースで補習</small></div>
+      </div>
+
+      <div class="conn"><span class="lbl">累計8問<br>到達</span><svg class="arrow" viewBox="0 0 64 20"><path d="M2 10 H54"/><polygon points="54,3 64,10 54,17"/></svg></div>
+
+      <div class="frame-wrap">
+        <div class="phone"><div class="screen">
+          <div class="statusbar"><span>16:55</span><span class="dots"><i></i><i></i><i></i><span class="batt"></span></span></div>
+          <div class="body" style="align-items:center;text-align:center;">
+            <svg class="lockglyph" viewBox="0 0 54 60" style="stroke:var(--ok);"><rect x="8" y="26" width="38" height="30" rx="6" style="stroke:var(--ok);fill:var(--ok-soft);"/><path d="M16 26 V18 a11 11 0 0 1 22 0" style="stroke:var(--ok);fill:none;"/></svg>
+            <span class="pill ok">解除しました</span>
+            <div class="h-line big">本日のミッション達成！</div>
+            <div class="box okb" style="width:100%;">
+              <div class="t-line" style="color:#0a6e3f;">対象アプリのロックを解除しました</div>
+            </div>
+            <div class="box dash" style="width:100%;"><div class="t-mini">次の制限開始</div><div class="count" style="font-size:22px;">明日 16:00</div></div>
+            <div class="spacer"></div>
+            <div class="btn ghost" style="width:100%;">ホームに戻る</div>
+          </div>
+        </div></div>
+        <div class="frame-cap">ホーム（解除済み）<small>達成・次回予告</small></div>
+      </div>
+
+    </div>
+  </section>
+
+  <div class="footer-note">
+    <h3>次に決めたい論点</h3>
+    <ol>
+      <li>合格判定は「初回10問のみ」で見るか、「再挑戦込みの累計8問」で見るか（本案は<b>累計</b>派）。</li>
+      <li>再挑戦は<b>同じ問題</b>か<b>類題</b>か。</li>
+      <li>AI採点が不確かなとき（読み取り不能）の扱い — 再撮影 / 手動確認 / スキップ。</li>
+      <li>16:00前に先回りして解くのを許可するか（「今日の範囲を先に見る」の挙動）。</li>
+      <li>ヒントを使った問題を正解扱いにするか。</li>
+    </ol>
+    <p class="phase-desc" style="margin-top:18px;">この流れでOKそうなら、次は<b>選んだ画面をハイファイ（清書）</b>にして、iPhoneの実機フレームで作り込みます。直したい遷移・足したい画面があれば教えてください。</p>
+  </div>
+
+</div>
+</body>
+</html>

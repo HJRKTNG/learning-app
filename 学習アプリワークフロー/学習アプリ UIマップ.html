@@ -1,0 +1,1042 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>学習アプリ UIマップ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#e9eaee;
+    --doc-ink:#23262e;
+    --doc-soft:#6a7180;
+    --line:#d4d7df;
+    --accent:#4f46e5;
+    --accent-d:#3a32c4;
+    --accent-soft:#eceafe;
+    --accent-ink:#3730a3;
+
+    /* in-app tokens */
+    --app-bg:#f1f2f5;
+    --app-ink:#1b1e26;
+    --app-2:#6b7280;
+    --app-3:#9aa1ad;
+    --app-line:#e2e4ea;
+    --app-group:#ffffff;
+    --ok:#1f9d57;
+    --ok-soft:#e3f5ea;
+    --warn:#d8812a;
+    --warn-soft:#fbeeda;
+    --bad:#d24b4b;
+    --bad-soft:#fae6e6;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:'Zen Kaku Gothic New',sans-serif;
+    background:var(--bg);color:var(--doc-ink);
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1560px;margin:0 auto;padding:52px 44px 140px;}
+
+  /* ===== doc header ===== */
+  .kicker{font-family:'IBM Plex Mono',monospace;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);font-size:12.5px;}
+  h1.doc{font-size:38px;margin:8px 0 0;font-weight:900;letter-spacing:.01em;}
+  .lede{color:var(--doc-soft);font-size:16px;margin-top:12px;max-width:780px;line-height:1.75;}
+  .meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px;}
+  .chip{font-family:'IBM Plex Mono',monospace;font-size:11.5px;font-weight:500;background:#fff;border:1px solid var(--line);border-radius:6px;padding:5px 10px;color:var(--doc-soft);}
+  .chip b{color:var(--accent-ink);font-weight:600;}
+
+  /* ===== section header ===== */
+  .sect{margin-top:74px;}
+  .sect-head{display:flex;align-items:center;gap:14px;border-bottom:2px solid var(--doc-ink);padding-bottom:12px;margin-bottom:8px;}
+  .sect-id{font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:14px;color:#fff;background:var(--doc-ink);border-radius:6px;padding:4px 11px;}
+  .sect-head h2{font-size:24px;margin:0;font-weight:700;flex:1;}
+  .sect-head .cnt{font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:var(--doc-soft);}
+  .sect-desc{color:var(--doc-soft);font-size:14.5px;margin:14px 0 30px;max-width:820px;line-height:1.7;}
+
+  /* ===== gallery grid ===== */
+  .gal{display:grid;grid-template-columns:repeat(auto-fill,minmax(258px,1fr));gap:38px 30px;}
+  .cell{display:flex;flex-direction:column;gap:13px;}
+  .cap{display:flex;flex-direction:column;gap:3px;}
+  .cap .id{font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;color:var(--accent);letter-spacing:.04em;}
+  .cap .nm{font-size:15px;font-weight:700;}
+  .cap .ds{font-size:12.5px;color:var(--doc-soft);line-height:1.5;}
+
+  /* ===== phone ===== */
+  .phone{
+    width:258px;height:540px;background:#fff;border:1.5px solid #c4c8d2;border-radius:36px;
+    padding:8px;position:relative;box-shadow:0 12px 26px -14px rgba(30,34,48,.45),0 2px 0 #fff inset;
+  }
+  .notch{position:absolute;top:11px;left:50%;transform:translateX(-50%);width:96px;height:24px;background:#11131a;border-radius:0 0 14px 14px;z-index:30;}
+  .scr{width:100%;height:100%;border-radius:29px;overflow:hidden;position:relative;background:var(--app-bg);display:flex;flex-direction:column;}
+
+  /* status bar */
+  .sb{height:32px;flex:0 0 auto;display:flex;align-items:flex-end;justify-content:space-between;padding:0 18px 4px;
+    font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:12px;color:var(--app-ink);position:relative;z-index:20;}
+  .sb.onlock{color:#fff;}
+  .sb .rt{display:flex;align-items:center;gap:5px;}
+  .sb .rt svg{display:block;}
+
+  /* nav bar */
+  .nav{flex:0 0 auto;padding:6px 16px 8px;display:flex;align-items:center;gap:6px;background:var(--app-bg);}
+  .nav.onwhite{background:#fff;border-bottom:1px solid var(--app-line);}
+  .nav .back{display:flex;align-items:center;gap:1px;color:var(--accent);font-size:14px;font-weight:500;}
+  .nav .back svg{width:9px;height:14px;}
+  .nav .title{flex:1;text-align:center;font-size:15px;font-weight:700;color:var(--app-ink);}
+  .nav .act{color:var(--accent);font-size:14px;font-weight:500;min-width:30px;text-align:right;}
+  .nav .act.bold{font-weight:700;}
+  .nav .spacer{min-width:30px;}
+  .ltitle{font-size:25px;font-weight:900;color:var(--app-ink);padding:2px 18px 10px;letter-spacing:.01em;}
+
+  /* scroll body */
+  .bd{flex:1;overflow:hidden;display:flex;flex-direction:column;}
+  .bd.pad{padding:4px 16px 16px;gap:14px;}
+  .bd.center{align-items:center;justify-content:center;text-align:center;padding:18px 22px;gap:13px;}
+
+  /* grouped list */
+  .glabel{font-size:11px;font-weight:600;color:var(--app-3);letter-spacing:.06em;text-transform:uppercase;padding:14px 16px 6px;}
+  .group{background:var(--app-group);border-top:1px solid var(--app-line);border-bottom:1px solid var(--app-line);}
+  .group.inset{margin:0 13px;border:1px solid var(--app-line);border-radius:12px;overflow:hidden;}
+  .row{display:flex;align-items:center;gap:11px;padding:11px 15px;min-height:46px;border-bottom:1px solid var(--app-line);background:var(--app-group);}
+  .row:last-child{border-bottom:none;}
+  .row .ic{width:26px;height:26px;border-radius:7px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;background:var(--accent-soft);}
+  .row .ic svg{width:15px;height:15px;}
+  .row .ic.gray{background:#eef0f4;}
+  .row .lbl{flex:1;font-size:14px;font-weight:500;color:var(--app-ink);line-height:1.3;}
+  .row .lbl small{display:block;font-size:11.5px;color:var(--app-2);font-weight:400;margin-top:1px;}
+  .row .val{font-size:13px;color:var(--app-2);font-family:'IBM Plex Mono',monospace;}
+  .chev{width:8px;height:13px;flex:0 0 auto;color:var(--app-3);}
+
+  /* toggle */
+  .tg{width:42px;height:25px;border-radius:999px;background:#d3d6dd;position:relative;flex:0 0 auto;}
+  .tg::after{content:"";position:absolute;top:2px;left:2px;width:21px;height:21px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25);transition:.2s;}
+  .tg.on{background:var(--ok);}
+  .tg.on::after{left:19px;}
+  .tg.on.ind{background:var(--accent);}
+
+  /* segmented */
+  .seg{display:flex;background:#e6e8ee;border-radius:9px;padding:2px;margin:0 0 2px;}
+  .seg span{flex:1;text-align:center;font-size:12.5px;font-weight:600;padding:6px 4px;border-radius:7px;color:var(--app-2);}
+  .seg span.on{background:#fff;color:var(--app-ink);box-shadow:0 1px 2px rgba(0,0,0,.12);}
+
+  /* stepper */
+  .step{display:flex;align-items:center;border:1px solid var(--app-line);border-radius:8px;overflow:hidden;}
+  .step b{width:30px;height:30px;display:flex;align-items:center;justify-content:center;font-size:17px;color:var(--accent);background:#f5f6f9;}
+  .step span{min-width:40px;text-align:center;font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:14px;color:var(--app-ink);}
+
+  /* buttons */
+  .btn{display:block;text-align:center;border-radius:13px;font-size:15px;font-weight:700;padding:14px;letter-spacing:.02em;}
+  .btn.pri{background:var(--accent);color:#fff;}
+  .btn.sec{background:#fff;color:var(--accent);border:1.5px solid var(--accent);}
+  .btn.dark{background:var(--app-ink);color:#fff;}
+  .btn.ghost{background:transparent;color:var(--accent);}
+  .btn.sm{padding:10px;font-size:13.5px;border-radius:10px;}
+  .btn.block{width:100%;}
+
+  /* tab bar */
+  .tabbar{flex:0 0 auto;display:flex;border-top:1px solid var(--app-line);background:rgba(255,255,255,.94);padding:6px 0 12px;}
+  .tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--app-3);font-size:10px;font-weight:600;}
+  .tab svg{width:21px;height:21px;}
+  .tab.on{color:var(--accent);}
+
+  /* misc text */
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  .big-time{font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:46px;letter-spacing:.01em;color:var(--app-ink);line-height:1;}
+  .h-xl{font-size:22px;font-weight:900;color:var(--app-ink);line-height:1.3;}
+  .h-lg{font-size:18px;font-weight:700;color:var(--app-ink);line-height:1.35;}
+  .p-sm{font-size:13px;color:var(--app-2);line-height:1.6;}
+  .p-xs{font-size:11.5px;color:var(--app-3);line-height:1.5;}
+
+  /* banner / status strip (flat, not floating card) */
+  .strip{border-radius:12px;padding:13px 15px;display:flex;flex-direction:column;gap:5px;}
+  .strip.ind{background:var(--accent-soft);}
+  .strip.ok{background:var(--ok-soft);}
+  .strip.warn{background:var(--warn-soft);}
+  .strip.bad{background:var(--bad-soft);}
+  .strip .t{font-size:12px;font-weight:700;letter-spacing:.04em;}
+  .strip.ind .t{color:var(--accent-ink);} .strip.ok .t{color:#137a40;}
+  .strip.warn .t{color:#9a5410;} .strip.bad .t{color:#a83232;}
+  .strip .v{font-size:13.5px;color:var(--app-ink);line-height:1.55;}
+
+  /* progress dots */
+  .dots10{display:flex;gap:4px;}
+  .dots10 i{flex:1;height:6px;border-radius:3px;background:#dcdfe6;}
+  .dots10 i.ok{background:var(--ok);}
+  .dots10 i.cur{background:var(--accent);}
+  .dots10 i.bad{background:var(--bad);}
+
+  /* lock state full screen */
+  .scr.lock{background:linear-gradient(180deg,#312c8f 0%,#1f1b63 100%);}
+  .lock .bd{color:#fff;}
+  .lockbig{width:64px;height:72px;margin:0 auto;}
+  .lockbig rect{fill:rgba(255,255,255,.14);stroke:#fff;stroke-width:2.4;}
+  .lockbig path{fill:none;stroke:#fff;stroke-width:2.4;}
+
+  /* camera */
+  .camview{flex:1;background:#1b1d24;position:relative;display:flex;align-items:center;justify-content:center;}
+  .camview .frame{position:absolute;inset:24px 18px;border:2px dashed rgba(255,255,255,.55);border-radius:10px;}
+  .camview .corner{position:absolute;width:20px;height:20px;border:3px solid var(--accent);}
+  .camview .hint{position:relative;color:#fff;font-size:12px;font-weight:600;text-align:center;opacity:.85;}
+  .cambar{flex:0 0 auto;background:#11131a;display:flex;align-items:center;justify-content:space-between;padding:14px 26px 20px;}
+  .cambar .small{color:#fff;font-size:11px;font-weight:600;opacity:.8;width:44px;text-align:center;}
+  .shutter{width:54px;height:54px;border-radius:50%;background:#fff;border:4px solid rgba(255,255,255,.4);}
+
+  /* OCR scan card */
+  .scanbox{border:1px solid var(--app-line);border-radius:12px;background:#fff;overflow:hidden;}
+  .scanimg{height:118px;background:repeating-linear-gradient(0deg,#f6f7f9,#f6f7f9 13px,#eceef3 13px,#eceef3 14px);position:relative;}
+  .scanimg::after{content:"";position:absolute;left:0;right:0;top:46%;height:2px;background:var(--accent);box-shadow:0 0 8px var(--accent);}
+
+  /* result ring */
+  .ring{width:104px;height:104px;border-radius:50%;display:grid;place-items:center;margin:2px auto;
+    background:conic-gradient(var(--ok) 0 80%, #e3e5ec 80% 100%);}
+  .ring.warnr{background:conic-gradient(var(--warn) 0 60%, #e3e5ec 60% 100%);}
+  .ring .inner{width:80px;height:80px;border-radius:50%;background:#fff;display:grid;place-items:center;}
+  .ring .inner b{font-family:'IBM Plex Mono',monospace;font-size:24px;color:var(--app-ink);}
+  .ring .inner small{font-size:10px;color:var(--app-2);}
+
+  /* problem / formula */
+  .qhead{display:flex;align-items:center;justify-content:space-between;}
+  .qno{font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:13px;color:var(--accent);}
+  .qbody{background:#fff;border:1px solid var(--app-line);border-radius:12px;padding:16px;flex:1;display:flex;flex-direction:column;gap:10px;}
+  .formula{font-size:18px;font-weight:600;color:var(--app-ink);line-height:1.5;}
+  .formula em{font-style:italic;font-family:'IBM Plex Mono',monospace;}
+
+  /* calendar mini */
+  .cal{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;}
+  .cal .d{aspect-ratio:1;border-radius:7px;display:grid;place-items:center;font-size:11px;font-family:'IBM Plex Mono',monospace;color:var(--app-2);background:#f3f4f7;}
+  .cal .d.done{background:var(--ok);color:#fff;font-weight:600;}
+  .cal .d.miss{background:var(--bad-soft);color:var(--bad);}
+  .cal .d.today{outline:2px solid var(--accent);color:var(--accent);font-weight:700;}
+
+  /* bar chart */
+  .chart{display:flex;align-items:flex-end;gap:6px;height:90px;padding-top:6px;}
+  .chart .bar{flex:1;background:var(--accent);border-radius:4px 4px 0 0;opacity:.85;}
+  .chart .bar.dim{background:#cfd2da;}
+
+  /* sheet (hint) */
+  .sheetwrap{position:absolute;inset:0;background:rgba(20,22,34,.4);display:flex;align-items:flex-end;border-radius:29px;overflow:hidden;}
+  .sheet{background:#fff;width:100%;border-radius:20px 20px 0 0;padding:10px 18px 22px;display:flex;flex-direction:column;gap:11px;}
+  .grab{width:38px;height:5px;border-radius:3px;background:#d4d7df;margin:0 auto 2px;}
+
+  /* ===== sitemap ===== */
+  .map{background:#fff;border:1.5px solid var(--line);border-radius:16px;padding:30px 30px 26px;margin-top:30px;}
+  .maprow{display:flex;gap:22px;flex-wrap:wrap;}
+  .mapcol{flex:1;min-width:210px;}
+  .mapcol h4{margin:0 0 12px;font-size:13px;font-family:'IBM Plex Mono',monospace;font-weight:600;color:var(--accent);letter-spacing:.04em;display:flex;align-items:center;gap:8px;}
+  .mapcol h4 .tnum{background:var(--accent);color:#fff;border-radius:5px;padding:2px 7px;font-size:11px;}
+  .mapcol ul{list-style:none;margin:0;padding:0;}
+  .mapcol li{font-size:13px;color:var(--doc-ink);padding:7px 0 7px 16px;border-left:2px solid var(--line);position:relative;line-height:1.4;}
+  .mapcol li::before{content:"";position:absolute;left:-1px;top:14px;width:9px;height:2px;background:var(--line);}
+  .mapcol li small{color:var(--doc-soft);font-size:11.5px;}
+  .mapcol li.sub{padding-left:30px;}
+  .mapcol li.sub::before{left:14px;width:9px;}
+
+  .flag{display:inline-block;font-family:'IBM Plex Mono',monospace;font-size:10.5px;font-weight:600;color:#fff;background:var(--doc-ink);border-radius:4px;padding:1px 6px;margin-left:6px;vertical-align:1px;}
+  .flag.a{background:#7c5cff;} .flag.b{background:#4f46e5;} .flag.c{background:#0e7d8a;} .flag.d{background:#b06a1e;}
+
+  /* footer */
+  .foot{margin-top:80px;border-top:2px dashed var(--line);padding-top:30px;}
+  .foot h3{font-size:18px;margin:0 0 14px;font-weight:700;}
+  .foot ol{color:var(--doc-soft);font-size:14.5px;line-height:1.9;max-width:840px;padding-left:22px;margin:0;}
+  .foot b{color:var(--accent-ink);}
+
+  @media(max-width:760px){.wrap{padding:32px 16px 100px;}h1.doc{font-size:28px;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="kicker">UI MAP / Mid-fidelity</div>
+    <h1 class="doc">学習アプリ — 画面インベントリ & UI仕様</h1>
+    <p class="lede">「16:00に対象アプリをロック → 数学ミッション（10問中8問正解）で解除」を中核に、オンボーディングから設定・学習記録まで全画面を洗い出しました。トーンは硬派・信頼感重視。<b style="color:var(--accent-ink)">AIアシスタント風の浮いたカードは使わず</b>、iOSネイティブのグループドリスト/ナビバー/タブバーで構成しています。</p>
+    <div class="meta">
+      <span class="chip">対象: <b>中高生（自分で使う）</b></span>
+      <span class="chip">教科: <b>数学中心</b></span>
+      <span class="chip">合格: <b>10問中8問</b></span>
+      <span class="chip">アクセント: <b>Indigo #4F46E5</b></span>
+      <span class="chip">タブ: <b>ホーム / 学習 / 復習 / 設定</b></span>
+      <span class="chip">画面数: <b>28</b></span>
+    </div>
+  </header>
+
+  <!-- ===================== SITEMAP ===================== -->
+  <section class="sect" style="margin-top:48px;">
+    <div class="sect-head"><span class="sect-id">IA</span><h2>情報設計・サイトマップ</h2><span class="cnt">4タブ + 設定 + 初期設定</span></div>
+    <p class="sect-desc">起動後の常設ナビは下部4タブ。ロック中はミッションが最優先で前面化します。設定はツールの心臓部なので独立した深い階層を持たせ、保護者によるロック解除防止（パスコード）もここに含めます。</p>
+    <div class="map">
+      <div class="maprow">
+        <div class="mapcol">
+          <h4><span class="tnum">A</span> オンボーディング<span class="flag a">初回のみ</span></h4>
+          <ul>
+            <li>A1 ようこそ / 仕組み説明</li>
+            <li>A2 権限リクエスト <small>（スクリーンタイム・通知・カメラ）</small></li>
+            <li>A3 ロック対象アプリの選択</li>
+            <li>A4 制限スケジュール（時刻・曜日）</li>
+            <li>A5 教科・範囲・難易度</li>
+            <li>A6 合格条件 + 保護者パスコード</li>
+          </ul>
+        </div>
+        <div class="mapcol">
+          <h4><span class="tnum">B</span> デイリーループ<span class="flag b">ホームタブ</span></h4>
+          <ul>
+            <li>B1 ホーム（自由・16:00前）</li>
+            <li>B2 ロック通知（フルスクリーン）</li>
+            <li>B3 ミッションハブ（進捗）</li>
+            <li>B4 問題</li>
+            <li class="sub">B5 ヒント（シート）</li>
+            <li>B6 解答を撮影</li>
+            <li class="sub">B7 採点中（OCR）</li>
+            <li>B8 採点結果・正解</li>
+            <li>B9 採点結果・不正解 + 解説</li>
+            <li>B10 ミッション結果（合否）</li>
+            <li class="sub">B11 再挑戦</li>
+            <li>B12 解除完了</li>
+          </ul>
+        </div>
+        <div class="mapcol">
+          <h4><span class="tnum">C</span> 設定<span class="flag c">設定タブ</span></h4>
+          <ul>
+            <li>C1 設定トップ</li>
+            <li class="sub">C2 ロックスケジュール</li>
+            <li class="sub">C3 対象アプリ</li>
+            <li class="sub">C4 教科・難易度</li>
+            <li class="sub">C5 合格条件</li>
+            <li class="sub">C6 通知</li>
+            <li class="sub">C7 保護者ロック / パスコード</li>
+            <li class="sub">C8 アカウント</li>
+          </ul>
+        </div>
+        <div class="mapcol">
+          <h4><span class="tnum">D</span> 学習・記録<span class="flag d">学習/復習タブ</span></h4>
+          <ul>
+            <li>D1 学習タブ（今日 / 履歴）</li>
+            <li>D2 復習ノート（間違い直し）</li>
+            <li>D3 統計・カレンダー</li>
+            <li>D4 問題・解説の詳細</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== A. ONBOARDING ===================== -->
+  <section class="sect">
+    <div class="sect-head"><span class="sect-id">A</span><h2>オンボーディング / 初期設定</h2><span class="cnt">6 screens</span></div>
+    <p class="sect-desc">最初の数分で「何を・いつ・どれだけやれば解除されるか」を本人が納得して設定する流れ。保護者パスコードを最後に設定し、本人が条件を勝手に緩められないようにします。</p>
+    <div class="gal">
+
+      <!-- A1 -->
+      <div class="cell">
+        <div class="cap"><span class="id">A1</span><span class="nm">ようこそ / 仕組み説明</span><span class="ds">アプリの約束を3ステップで提示</span></div>
+        <div class="phone"><div class="notch"></div><div class="scr">
+          <div class="sb"><span>9:41</span><span class="rt"><span>5G</span><span class="mono">86%</span></span></div>
+          <div class="bd center">
+            <div style="font-family:'IBM Plex Mono';font-weight:600;font-size:13px;color:var(--accent);letter-spacing:.1em;">STUDY LOCK</div>
+            <div class="h-xl">毎日16時から<br>“勉強しないと開かない”</div>
+            <p class="p-sm" style="max-width:200px;">対象アプリをロックし、数学を10問中8問解くと解除されます。</p>
+            <div style="display:flex;flex-direction:column;gap:9px;width:100%;text-align:left;margin-top:4px;">
+              <div class="strip ind"><span class="t">① ロック</span><span class="v">16:00にSNS・動画を停止</span></div>
+              <div class="strip ind"><span class="t">② 学習</span><span class="v">今日の数学ミッションを解く</span></div>
+              <div class="strip ind"><span class="t">③ 解除</span><span class="v">8問正解で翌16時まで自由</span></div>
+            </div>
+            <div style="flex:1;"></div>
+            <a class="btn pri block">はじめる</a>
+            <a class="btn ghost block">すでにアカウントを持っている</a>
+          </div>
+        </div></div>
+      </div>
+
+      <!-- A2 -->
+      <div class="cell">
+        <div class="cap"><span class="id">A2</span><span class="nm">権限リクエスト</span><span class="ds">3つの権限を理由つきで許可</span></div>
+        <div class="phone"><div class="notch"></div><div class="scr">
+          <div class="sb"><span>9:41</span><span class="rt"><span>5G</span><span class="mono">86%</span></span></div>
+          <div class="nav"><span class="spacer"></span><span class="title">権限の許可</span><span class="act">スキップ</span></div>
+          <div class="bd pad">
+            <p class="p-sm">アプリが正しく動くために、次の3つを許可してください。</p>
+            <div class="group inset">
+              <div class="row"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#4f46e5" stroke-width="2"><rect x="5" y="3" width="14" height="18" rx="3"/><line x1="12" y1="17" x2="12" y2="17"/></svg></span><span class="lbl">スクリーンタイム<small>対象アプリのロックに必須</small></span><span class="tg on ind"></span></div>
+              <div class="row"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#4f46e5" stroke-width="2"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 7 3 9H3c0-2 3-2 3-9z"/></svg></span><span class="lbl">通知<small>16時の開始・解除のお知らせ</small></span><span class="tg on ind"></span></div>
+              <div class="row"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#4f46e5" stroke-width="2"><rect x="3" y="6" width="18" height="13" rx="3"/><circle cx="12" cy="12.5" r="3.5"/></svg></span><span class="lbl">カメラ<small>ノートの撮影・採点に使用</small></span><span class="tg" style="background:#d3d6dd;"></span></div>
+            </div>
+            <p class="p-xs">許可した内容はいつでも設定から変更できます。</p>
+            <div style="flex:1;"></div>
+            <a class="btn pri block">続ける</a>
+          </div>
+        </div></div>
+      </div>
+
+      <!-- A3 -->
+      <div class="cell">
+        <div class="cap"><span class="id">A3</span><span class="nm">ロック対象アプリの選択</span><span class="ds">検索 + カテゴリで複数選択</span></div>
+        <div class="phone"><div class="notch"></div><div class="scr">
+          <div class="sb"><span>9:41</span><span class="rt"><span>5G</span><span class="mono">86%</span></span></div>
+          <div class="nav"><span class="back"><svg viewBox="0 0 9 14" fill="none" stroke="#4f46e5" stroke-width="2"><path d="M8 1 1 7l7 6"/></svg>戻る</span><span class="title">対象アプリ</span><span class="act bold">次へ</span></div>
+          <div class="bd">
+            <div style="padding:2px 14px 8px;"><div style="background:#e6e8ee;border-radius:9px;padding:8px 12px;font-size:13px;color:var(--app-3);">🔍 アプリを検索</div></div>
+            <div class="glabel">選択中 3</div>
+            <div class="group">
+              <div class="row"><span class="ic gray"></span><span class="lbl">動画系SNS</span><span class="tg on ind"></span></div>
+              <div class="row"><span class="ic gray"></span><span class="lbl">ショート動画</span><span class="tg on ind"></span></div>
+              <div class="row"><span class="ic gray"></span><span class="lbl">ゲーム（3本）</span><span class="tg on ind"></span></div>
+            </div>
+            <div class="glabel">よく使うアプリ</div>
+            <div class="group">
+              <div class="row"><span class="ic gray"></span><span class="lbl">メッセージ</span><span class="tg"></span></div>
+              <div class="row"><span class="ic gray"></span><span class="lbl">音楽</span><span class="tg"></span></div>
+            </div>
+          </div>
+        </div></div>
+      </div>
+
+      <!-- A4 -->
+      <div class="cell">
+        <div class="cap"><span class="id">A4</span><span class="nm">制限スケジュール</span><span class="ds">開始時刻・曜日を設定</span></div>
+        <div class="phone"><div class="notch"></div><div class="scr">
+          <div class="sb"><span>9:41</span><span class="rt"><span>5G</span><span class="mono">86%</span></span></div>
+          <div class="nav"><span class="back"><svg viewBox="0 0 9 14" fill="none" stroke="#4f46e5" stroke-width="2"><path d="M8 1 1 7l7 6"/></svg>戻る</span><span class="title">スケジュール</span><span class="act bold">次へ</span></div>
+          <div class="bd pad">
+            <div class="glabel" style="padding-left:2px;">ロック開始</div>
+            <div style="background:#fff;border:1px solid var(--app-line);border-radius:12px;padding:14px;display:flex;align-items:center;justify-content:center;gap:6px;">
+              <span class="big-time" style="font-size:40px;">16</span><span class="big-time" style="font-size:40px;">:</span><span class="big-time" style="font-size:40px;">00</span>
+            </div>
+            <p class="p-xs" style="padding-left:2px;">この時刻に対象アプリがロックされます。</p>
+            <div class="glabel" style="padding-left:2px;">繰り返す曜日</div>
+            <div style="display:flex;gap:5px;">
+              <span class="pillday on">月</span><span class="pillday on">火</span><span class="pillday on">水</span><span class="pillday on">木</span><span class="pillday on">金</span><span class="pillday">土</span><span class="pillday">日</span>
+            </div>
+            <div style="flex:1;"></div>
+            <a class="btn pri block">次へ</a>
+          </div>
+        </div></div>
+      </div>
+
+      <!-- A5 -->
+      <div class="cell">
+        <div class="cap"><span class="id">A5</span><span class="nm">教科・範囲・難易度</span><span class="ds">数学中心、範囲と難度を指定</span></div>
+        <div class="phone"><div class="notch"></div><div class="scr">
+          <div class="sb"><span>9:41</span><span class="rt"><span>5G</span><span class="mono">86%</span></span></div>
+          <div class="nav"><span class="back"><svg viewBox="0 0 9 14" fill="none" stroke="#4f46e5" stroke-width="2"><path d="M8 1 1 7l7 6"/></svg>戻る</span><span class="title">学習内容</span><span class="act bold">次へ</span></div>
+          <div class="bd">
+            <div class="glabel">教科</div>
+            <div class="group">
+              <div class="row"><span class="lbl">数学</span><span class="tg on ind"></span></div>
+              <div class="row"><span class="lbl">英語</span><span class="tg"></span></div>
+              <div class="row"><span class="lbl">理科</span><span class="tg"></span></div>
+            </div>
+            <div class="glabel">数学の範囲</div>
+            <div class="group">
+              <div class="row"><span class="lbl">二次関数</span><span class="chev"><svg viewBox="0 0 8 13" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 1l6 5.5L1 12"/></svg></span></div>
+            </div>
+            <div class="glabel">難易度</div>
+            <div style="padding:0 14px;"><div class="seg"><span>やさしい</span><span class="on">標準</span><span>応用</span></div></div>
+          </div>
+        </div></div>
+      </div>
+
+      <!-- A6 -->
+      <div class="cell">
+        <div class="cap"><span class="id">A6</span><span class="nm">合格条件 + 保護者パスコード</span><span class="ds">解除ラインと改変防止</span></div>
+        <div class="phone"><div class="notch"></div><div class="scr">
+          <div class="sb"><span>9:41</span><span class="rt"><span>5G</span><span class="mono">86%</span></span></div>
+          <div class="nav"><span class="back"><svg viewBox="0 0 9 14" fill="none" stroke="#4f46e5" stroke-width="2"><path d="M8 1 1 7l7 6"/></svg>戻る</span><span class="title">解除の条件</span><span class="spacer"></span></div>
+          <div class="bd pad">
+            <div class="glabel" style="padding-left:2px;">合格ライン</div>
+            <div style="background:#fff;border:1px solid var(--app-line);border-radius:12px;padding:14px;display:flex;align-items:center;justify-content:space-between;">
+              <span style="font-size:14px;font-weight:500;">出題数</span><div class="step"><b>−</b><span>10</span><b>+</b></div>
+            </div>
+            <div style="background:#fff;border:1px solid var(--app-line);border-radius:12px;padding:14px;display:flex;align-items:center;justify-content:space-between;">
+              <span style="font-size:14px;font-weight:500;">正解で解除</span><div class="step"><b>−</b><span>8</span><b>+</b></div>
+            </div>
+            <div class="strip ind"><span class="t">プレビュー</span><span class="v">10問中8問（80%）正解で解除</span></div>
+            <div class="glabel" style="padding-left:2px;">保護者パスコード</div>
+            <div style="display:flex;gap:8px;justify-content:center;">
+              <span class="pin">●</span><span class="pin">●</span><span class="pin">●</span><span class="pin on"></span>
+            </div>
+            <p class="p-xs" style="text-align:center;">条件の変更・解除には保護者の暗証番号が必要になります。</p>
+            <div style="flex:1;"></div>
+            <a class="btn pri block">設定を完了</a>
+          </div>
+        </div></div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ===================== B. DAILY LOOP ===================== -->
+  <section class="sect">
+    <div class="sect-head"><span class="sect-id">B</span><h2>デイリーループ</h2><span class="cnt">12 screens</span></div>
+    <p class="sect-desc">自由 → 16時ロック → 1問ずつ（問題→撮影→採点）→ 合否判定 → 解除。撮影とAI採点はツール内の機能として淡々と扱い、演出は最小限にしています。</p>
+    <div class="gal">
+
+      <!-- B1 -->
+      <div class="cell">
+        <div class="cap"><span class="id">B1</span><span class="nm">ホーム（自由・16時前）</span><span class="ds">次のロックまでカウントダウン</span></div>
+        <div class="phone"><div class="notch"></div><div class="scr">
+          <div class="sb"><span>13:58</span><span class="rt"><span>5G</span><span class="mono">86%</span></span></div>
+          <div class="ltitle">ホーム</div>
+          <div class="bd pad">
+            <div style="background:#fff;border:1px solid var(--app-line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:7px;">
+              <span class="p-xs" style="text-transform:uppercase;letter-spacing:.08em;">次のロックまで</span>
+              <span class="big-time">02:01:40</span>
+              <span class="p-sm">16:00 から今日の数学ミッションが始まります。</span>
+            </div>
+            <div class="glabel" style="padding-left:2px;">今日の予定</div>
+            <div class="group inset">
+              <div class="row"><span class="lbl">範囲</span><span class="val">二次関数</span></div>
+              <div class="row"><span class="lbl">問題数</span><span class="val">10問</span></div>
+              <div class="row"><span class="lbl">解除ライン</span><span class="val">8問正解</span></div>
+            </div>
+            <a class="btn sec block sm">今日の範囲を予習する</a>
+          </div>
+          <div class="tabbar">
+            <span class="tab on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-7 9 7"/><path d="M5 10v9h14v-9"/></svg>ホーム</span>
+            <span class="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16M4 12h16M4 19h10"/></svg>学習</span>
+            <span class="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h13l3 3v13H4z"/><path d="M8 9h8M8 13h6"/></svg>復習</span>
+            <span class="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg>設定</span>
+          </div>
+        </div></div>
+      </div>
+
+      <!-- B2 -->
+      <div class="cell">
+        <div class="cap"><span class="id">B2</span><span class="nm">ロック通知（全画面）</span><span class="ds">16:00 ちょうどに前面化</span></div>
+        <div class="phone"><div class="notch"></div><div class="scr lock">
+          <div class="sb onlock"><span>16:00</span><span class="rt"><span>5G</span><span class="mono">85%</span></span></div>
+          <div class="bd center">
+            <svg class="lockbig" viewBox="0 0 64 72"><rect x="10" y="30" width="44" height="36" rx="7"/><path d="M19 30 V20 a13 13 0 0 1 26 0 V30"/></svg>
+            <div class="h-xl" style="color:#fff;">学習タイムです</div>
+            <p style="color:rgba(255,255,255,.8);font-size:13px;max-width:200px;line-height:1.6;">対象アプリを一時的にロックしました。今日の数学を解くと解除されます。</p>
+            <div style="background:rgba(255,255,255,.12);border-radius:12px;padding:13px 16px;width:100%;text-align:left;">
+              <div style="color:#fff;font-weight:700;font-size:13px;">今日の数学ミッション</div>
+              <div style="color:rgba(255,255,255,.85);font-size:12.5px;margin-top:3px;">全10問 ／ 8問正解で解除</div>
+            </div>
+            <div style="flex:1;"></div>
+            <a class="btn block" style="background:#fff;color:var(--accent-d);">ミッションを始める</a>
+            <span style="color:rgba(255,255,255,.6);font-size:11.5px;">あとで（5分後に再通知）</span>
+          </div>
+        </div></div>
+      </div>
+
+      <!-- B3 -->
+      <div class="cell">
+        <div class="cap"><span class="id">B3</span><span class="nm">ミッションハブ</span><span class="ds">進捗・残り・開始導線</span></div>
+        <div class="phone"><div class="notch"></div><div class="scr">
+          <div class="sb"><span>16:01</span><span class="rt"><span>5G</span><span class="mono">85%</span></span></div>
+          <div class="nav onwhite"><span class="spacer"></span><span class="title">今日のミッション</span><span class="act">？</span></div>
+          <div class="bd pad" style="background:#fff;">
+            <div class="strip ind" style="flex-direction:row;align-items:center;justify-content:space-between;">
+              <div><div class="t">ロック中</div><div class="v" style="font-size:12px;">対象アプリは停止しています</div></div>
+            </div>
+            <div style="text-align:center;padding:8px 0 2px;">
+              <div class="ring" style="background:conic-gradient(var(--accent) 0 30%, #e3e5ec 30%);"><div class="inner"><b>3/10</b><small>正解 3</small></div></div>
+            </div>
+            <div class="dots10"><i class="ok"></i><i class="ok"></i><i class="ok"></i><i class="cur"></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+            <p class="p-sm" style="text-align:center;">解除まであと <b style="color:var(--accent-ink);">5問</b> 正解</p>
+            <div style="flex:1;"></div>
+            <a class="btn pri block">問題4 を解く</a>
+          </div>
+        </div></div>
+      </div>
+
+      <!-- B4 -->
+      <div class="cell">
+        <div class="cap"><span class="id">B4</span><span class="nm">問題</span><span class="ds">問題文・番号・ヒント/撮影</span></div>
+        <div class="phone"><div class="notch"></div><div class="scr">
+          <div class="sb"><span>16:08</span><span class="rt"><span>5G</span><span class="mono">84%</span></span></div>
+          <div class="nav onwhite"><span class="back"><svg viewBox="0 0 9 14" fill="none" stroke="#4f46e5" stroke-width="2"><path d="M8 1 1 7l7 6"/></svg></span><span class="title">問題 4 / 10</span><span class="act">中断</span></div>
+          <div class="bd pad" style="background:#fff;">
+            <div class="dots10"><i class="ok"></i><i class="ok"></i><i class="ok"></i><i class="cur"></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+            <div class="qbody">
+              <span class="qno">二次関数 · 頂点</span>
+              <div class="formula">y = x² − 4x + 3 の頂点の座標を求めよ。</div>
+              <div style="flex:1;"></div>
+              <span class="p-xs">途中式もノートに書いて撮影してください。</span>
+            </div>
+            <a class="btn pri block">解答を撮影する</a>
+            <a class="btn sec block sm">ヒントを見る</a>
+          </div>
+        </div></div>
+      </div>
+
+      <!-- B5 -->
+      <div class="cell">
+        <div class="cap"><span class="id">B5</span><span class="nm">ヒント（シート）</span><span class="ds">段階ヒント、答えは出さない</span></div>
+        <div class="phone"><div class="notch"></div><div class="scr">
+          <div class="sb"><span>16:09</span><span class="rt"><span>5G</span><span class="mono">84%</span></span></div>
+          <div class="nav onwhite"><span class="back"><svg viewBox="0 0 9 14" fill="none" stroke="#4f46e5" stroke-width="2"><path d="M8 1 1 7l7 6"/></svg></span><span class="title">問題 4 / 10</span><span class="act">中断</span></div>
+          <div class="bd pad" style="background:#fff;"><div class="qbody"><span class="qno">二次関数 · 頂点</span><div class="formula">y = x² − 4x + 3 …</div></div></div>
+          <div class="sheetwrap"><div class="sheet">
+            <div class="grab"></div>
+            <div class="h-lg">ヒント</div>
+            <div class="strip ind"><span class="t">STEP 1</span><span class="v">平方完成 y = (x − a)² + b の形に変形してみよう。</span></div>
+            <div class="strip" style="background:#f3f4f7;"><span class="t" style="color:var(--app-3);">STEP 2（タップで開く）</span></div>
+            <a class="btn sec block sm">閉じて解く</a>
+          </div></div>
+        </div></div>
+      </div>
+
+      <!-- B6 -->
+      <div class="cell">
+        <div class="cap"><span class="id">B6</span><span class="nm">解答を撮影</span><span class="ds">枠ガイド付きカメラ</span></div>
+        <div class="phone"><div class="notch"></div><div class="scr">
+          <div class="sb onlock"><span>16:09</span><span class="rt"><span>5G</span><span class="mono">84%</span></span></div>
+          <div class="camview">
+            <div class="frame"></div>
+            <div class="corner" style="top:18px;left:12px;border-right:0;border-bottom:0;"></div>
+            <div class="corner" style="top:18px;right:12px;border-left:0;border-bottom:0;"></div>
+            <div class="corner" style="bottom:74px;left:12px;border-right:0;border-top:0;"></div>
+            <div class="corner" style="bottom:74px;right:12px;border-left:0;border-top:0;"></div>
+            <div class="hint">枠の中に<br>解答用紙を合わせてください</div>
+          </div>
+          <div class="cambar"><span class="small">アルバム</span><span class="shutter"></span><span class="small">ライト</span></div>
+        </div></div>
+      </div>
+
+      <!-- B7 -->
+      <div class="cell">
+        <div class="cap"><span class="id">B7</span><span class="nm">採点中（OCR）</span><span class="ds">読み取り→AI採点の待機</span></div>
+        <div class="phone"><div class="notch"></div><div class="scr">
+          <div class="sb"><span>16:09</span><span class="rt"><span>5G</span><span class="mono">84%</span></span></div>
+          <div class="nav onwhite"><span class="spacer"></span><span class="title">採点中</span><span class="spacer"></span></div>
+          <div class="bd pad" style="background:#fff;">
+            <div class="scanbox"><div class="scanimg"></div></div>
+            <div style="text-align:center;padding:6px 0;">
+              <div class="h-lg">読み取っています…</div>
+              <p class="p-sm">手書きの式を認識し、考え方を確認中です。</p>
+            </div>
+            <div class="group inset">
+              <div class="row"><span class="lbl" style="font-size:13px;">文字の認識</span><span class="val" style="color:var(--ok);">完了</span></div>
+              <div class="row"><span class="lbl" style="font-size:13px;">式の照合</span><span class="val" style="color:var(--accent);">処理中…</span></div>
+            </div>
+          </div>
+        </div></div>
+      </div>
+
+      <!-- B8 -->
+      <div class="cell">
+        <div class="cap"><span class="id">B8</span><span class="nm">採点結果・正解</span><span class="ds">正誤・要点・進捗・次へ</span></div>
+        <div class="phone"><div class="notch"></div><div class="scr">
+          <div class="sb"><span>16:10</span><span class="rt"><span>5G</span><span class="mono">84%</span></span></div>
+          <div class="bd pad" style="background:#fff;padding-top:18px;">
+            <div style="display:flex;align-items:center;gap:9px;">
+              <span style="width:30px;height:30px;border-radius:50%;background:var(--ok);display:grid;place-items:center;"><svg viewBox="0 0 24 24" width="16" fill="none" stroke="#fff" stroke-width="3"><path d="M4 12l5 5L20 6"/></svg></span>
+              <span class="h-xl" style="color:#137a40;">正解</span>
+            </div>
+            <div class="qbody" style="flex:none;">
+              <span class="qno">あなたの答え</span><div class="formula">頂点 (2, −1)</div>
+            </div>
+            <div class="strip ok"><span class="t">ポイント</span><span class="v">平方完成 y=(x−2)²−1 まで正しく変形できています。</span></div>
+            <div class="dots10"><i class="ok"></i><i class="ok"></i><i class="ok"></i><i class="ok"></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+            <p class="p-sm" style="text-align:center;">正解 <b style="color:#137a40;">4</b> ／ あと <b>4</b> 問</p>
+            <div style="flex:1;"></div>
+            <a class="btn pri block">次の問題へ</a>
+          </div>
+        </div></div>
+      </div>
+
+      <!-- B9 -->
+      <div class="cell">
+        <div class="cap"><span class="id">B9</span><span class="nm">採点結果・不正解 + 解説</span><span class="ds">どこで間違えたかを提示</span></div>
+        <div class="phone"><div class="notch"></div><div class="scr">
+          <div class="sb"><span>16:14</span><span class="rt"><span>5G</span><span class="mono">83%</span></span></div>
+          <div class="bd pad" style="background:#fff;padding-top:18px;">
+            <div style="display:flex;align-items:center;gap:9px;">
+              <span style="width:30px;height:30px;border-radius:50%;background:var(--bad);display:grid;place-items:center;"><svg viewBox="0 0 24 24" width="15" fill="none" stroke="#fff" stroke-width="3"><path d="M6 6l12 12M18 6L6 18"/></svg></span>
+              <span class="h-xl" style="color:#a83232;">不正解</span>
+            </div>
+            <div class="strip bad"><span class="t">あなたの答え</span><span class="v">(2, 1) — 定数項の符号でミスがあります。</span></div>
+            <div class="strip ok"><span class="t">正しい考え方</span><span class="v">y=(x−2)²−1。+3−4=−1 が頂点のy座標。</span></div>
+            <div class="dots10"><i class="ok"></i><i class="ok"></i><i class="ok"></i><i class="ok"></i><i class="bad"></i><i></i><i></i><i></i><i></i><i></i></div>
+            <div style="flex:1;"></div>
+            <a class="btn pri block">次の問題へ</a>
+            <a class="btn ghost block sm">この問題を復習に追加</a>
+          </div>
+        </div></div>
+      </div>
+
+      <!-- B10 -->
+      <div class="cell">
+        <div class="cap"><span class="id">B10</span><span class="nm">ミッション結果（合否）</span><span class="ds">10問完了・正答率・分岐</span></div>
+        <div class="phone"><div class="notch"></div><div class="scr">
+          <div class="sb"><span>16:42</span><span class="rt"><span>5G</span><span class="mono">80%</span></span></div>
+          <div class="nav onwhite"><span class="spacer"></span><span class="title">ミッション結果</span><span class="spacer"></span></div>
+          <div class="bd pad" style="background:#fff;">
+            <div style="text-align:center;padding:6px 0;">
+              <div class="ring warnr"><div class="inner"><b>6/10</b><small>正答率 60%</small></div></div>
+            </div>
+            <div class="strip warn"><span class="t">あと2問で解除</span><span class="v">間違えた4問から再挑戦できます。累計8問正解で解除です。</span></div>
+            <div class="dots10"><i class="ok"></i><i class="bad"></i><i class="ok"></i><i class="bad"></i><i class="ok"></i><i class="ok"></i><i class="bad"></i><i class="ok"></i><i class="bad"></i><i class="ok"></i></div>
+            <div style="flex:1;"></div>
+            <a class="btn dark block">再挑戦に進む</a>
+            <a class="btn ghost block sm">間違えた問題を見直す</a>
+          </div>
+        </div></div>
+      </div>
+
+      <!-- B11 -->
+      <div class="cell">
+        <div class="cap"><span class="id">B11</span><span class="nm">再挑戦</span><span class="ds">不正解の類題で補習</span></div>
+        <div class="phone"><div class="notch"></div><div class="scr">
+          <div class="sb"><span>16:43</span><span class="rt"><span>5G</span><span class="mono">80%</span></span></div>
+          <div class="nav onwhite"><span class="spacer"></span><span class="title">再挑戦</span><span class="spacer"></span></div>
+          <div class="bd pad" style="background:#fff;">
+            <div class="strip warn"><span class="t">あと2問で解除</span><span class="v">間違えた4問の類題に挑戦します。</span></div>
+            <div class="glabel" style="padding-left:2px;">再挑戦リスト</div>
+            <div class="group inset">
+              <div class="row"><span class="lbl" style="font-size:13px;">問2 · 平方完成</span><span class="val" style="color:var(--warn);">再挑戦</span></div>
+              <div class="row"><span class="lbl" style="font-size:13px;">問4 · 頂点</span><span class="val" style="color:var(--warn);">再挑戦</span></div>
+              <div class="row"><span class="lbl" style="font-size:13px;">問7 · 軸</span><span class="val" style="color:var(--warn);">再挑戦</span></div>
+              <div class="row"><span class="lbl" style="font-size:13px;">問9 · 最小値</span><span class="val" style="color:var(--warn);">再挑戦</span></div>
+            </div>
+            <div style="flex:1;"></div>
+            <a class="btn pri block">再挑戦を始める</a>
+          </div>
+        </div></div>
+      </div>
+
+      <!-- B12 -->
+      <div class="cell">
+        <div class="cap"><span class="id">B12</span><span class="nm">解除完了</span><span class="ds">達成・次回予告</span></div>
+        <div class="phone"><div class="notch"></div><div class="scr">
+          <div class="sb"><span>16:55</span><span class="rt"><span>5G</span><span class="mono">79%</span></span></div>
+          <div class="bd center" style="background:#fff;">
+            <span style="width:60px;height:60px;border-radius:50%;background:var(--ok-soft);display:grid;place-items:center;"><svg viewBox="0 0 24 24" width="30" fill="none" stroke="#1f9d57" stroke-width="2.6"><path d="M4 12l5 5L20 6"/></svg></span>
+            <div class="h-xl" style="color:#137a40;">ロック解除！</div>
+            <p class="p-sm" style="max-width:200px;">今日のミッション達成。対象アプリが使えるようになりました。</p>
+            <div class="group inset" style="width:100%;margin:0;">
+              <div class="row"><span class="lbl">今日の正解</span><span class="val">8 / 10</span></div>
+              <div class="row"><span class="lbl">連続達成</span><span class="val">12日</span></div>
+              <div class="row"><span class="lbl">次のロック</span><span class="val">明日 16:00</span></div>
+            </div>
+            <div style="flex:1;"></div>
+            <a class="btn pri block">ホームに戻る</a>
+          </div>
+        </div></div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ===================== C. SETTINGS ===================== -->
+  <section class="sect">
+    <div class="sect-head"><span class="sect-id">C</span><h2>設定</h2><span class="cnt">8 screens</span></div>
+    <p class="sect-desc">ツールの中枢。スケジュール・対象アプリ・合格条件など“ルール”を細かく調整でき、保護者パスコードで本人の改変を防ぎます。すべて標準的なグループドリストで、迷いなく操作できる構成です。</p>
+    <div class="gal">
+
+      <!-- C1 -->
+      <div class="cell">
+        <div class="cap"><span class="id">C1</span><span class="nm">設定トップ</span><span class="ds">全カテゴリの入り口</span></div>
+        <div class="phone"><div class="notch"></div><div class="scr">
+          <div class="sb"><span>20:30</span><span class="rt"><span>5G</span><span class="mono">62%</span></span></div>
+          <div class="ltitle">設定</div>
+          <div class="bd">
+            <div class="glabel">ルール</div>
+            <div class="group">
+              <div class="row"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#4f46e5" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span><span class="lbl">ロックスケジュール</span><span class="val">16:00</span><span class="chev"><svg viewBox="0 0 8 13" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 1l6 5.5L1 12"/></svg></span></div>
+              <div class="row"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#4f46e5" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="4"/></svg></span><span class="lbl">対象アプリ</span><span class="val">3</span><span class="chev"><svg viewBox="0 0 8 13" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 1l6 5.5L1 12"/></svg></span></div>
+              <div class="row"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#4f46e5" stroke-width="2"><path d="M4 19V5M4 5h12l-2 4 2 4H4"/></svg></span><span class="lbl">教科・難易度</span><span class="val">数学</span><span class="chev"><svg viewBox="0 0 8 13" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 1l6 5.5L1 12"/></svg></span></div>
+              <div class="row"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#4f46e5" stroke-width="2"><path d="M4 12l5 5L20 6"/></svg></span><span class="lbl">合格条件</span><span class="val">8/10</span><span class="chev"><svg viewBox="0 0 8 13" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 1l6 5.5L1 12"/></svg></span></div>
+            </div>
+            <div class="glabel">アプリ</div>
+            <div class="group">
+              <div class="row"><span class="ic gray"><svg viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 7 3 9H3c0-2 3-2 3-9z"/></svg></span><span class="lbl">通知</span><span class="chev"><svg viewBox="0 0 8 13" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 1l6 5.5L1 12"/></svg></span></div>
+              <div class="row"><span class="ic gray"><svg viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span><span class="lbl">保護者ロック</span><span class="chev"><svg viewBox="0 0 8 13" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 1l6 5.5L1 12"/></svg></span></div>
+              <div class="row"><span class="ic gray"><svg viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20a8 8 0 0 1 16 0"/></svg></span><span class="lbl">アカウント</span><span class="chev"><svg viewBox="0 0 8 13" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 1l6 5.5L1 12"/></svg></span></div>
+            </div>
+          </div>
+          <div class="tabbar">
+            <span class="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-7 9 7"/><path d="M5 10v9h14v-9"/></svg>ホーム</span>
+            <span class="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16M4 12h16M4 19h10"/></svg>学習</span>
+            <span class="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h13l3 3v13H4z"/><path d="M8 9h8M8 13h6"/></svg>復習</span>
+            <span class="tab on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg>設定</span>
+          </div>
+        </div></div>
+      </div>
+
+      <!-- C2 -->
+      <div class="cell">
+        <div class="cap"><span class="id">C2</span><span class="nm">ロックスケジュール</span><span class="ds">時刻・曜日・週末例外</span></div>
+        <div class="phone"><div class="notch"></div><div class="scr">
+          <div class="sb"><span>20:31</span><span class="rt"><span>5G</span><span class="mono">62%</span></span></div>
+          <div class="nav"><span class="back"><svg viewBox="0 0 9 14" fill="none" stroke="#4f46e5" stroke-width="2"><path d="M8 1 1 7l7 6"/></svg>設定</span><span class="title">スケジュール</span><span class="spacer"></span></div>
+          <div class="bd">
+            <div class="glabel">開始時刻</div>
+            <div class="group"><div class="row"><span class="lbl">ロック開始</span><span class="val" style="color:var(--accent);">16:00</span></div></div>
+            <div class="glabel">繰り返す曜日</div>
+            <div class="group">
+              <div class="row"><span class="lbl">平日（月〜金）</span><span class="tg on ind"></span></div>
+              <div class="row"><span class="lbl">土曜</span><span class="tg"></span></div>
+              <div class="row"><span class="lbl">日曜</span><span class="tg"></span></div>
+            </div>
+            <div class="glabel">例外</div>
+            <div class="group"><div class="row"><span class="lbl">テスト休みを設定<small>指定日はロックしない</small></span><span class="chev"><svg viewBox="0 0 8 13" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 1l6 5.5L1 12"/></svg></span></div></div>
+          </div>
+        </div></div>
+      </div>
+
+      <!-- C3 -->
+      <div class="cell">
+        <div class="cap"><span class="id">C3</span><span class="nm">対象アプリ</span><span class="ds">ロックするアプリの管理</span></div>
+        <div class="phone"><div class="notch"></div><div class="scr">
+          <div class="sb"><span>20:32</span><span class="rt"><span>5G</span><span class="mono">61%</span></span></div>
+          <div class="nav"><span class="back"><svg viewBox="0 0 9 14" fill="none" stroke="#4f46e5" stroke-width="2"><path d="M8 1 1 7l7 6"/></svg>設定</span><span class="title">対象アプリ</span><span class="act">追加</span></div>
+          <div class="bd">
+            <div class="glabel">ロック中 3</div>
+            <div class="group">
+              <div class="row"><span class="ic gray"></span><span class="lbl">動画系SNS</span><span class="tg on ind"></span></div>
+              <div class="row"><span class="ic gray"></span><span class="lbl">ショート動画</span><span class="tg on ind"></span></div>
+              <div class="row"><span class="ic gray"></span><span class="lbl">ゲーム（3本）</span><span class="tg on ind"></span></div>
+            </div>
+            <div class="glabel">許可（ロックしない）</div>
+            <div class="group">
+              <div class="row"><span class="ic gray"></span><span class="lbl">メッセージ</span><span class="tg"></span></div>
+              <div class="row"><span class="ic gray"></span><span class="lbl">電話</span><span class="tg"></span></div>
+            </div>
+          </div>
+        </div></div>
+      </div>
+
+      <!-- C4 -->
+      <div class="cell">
+        <div class="cap"><span class="id">C4</span><span class="nm">教科・難易度</span><span class="ds">範囲と難度の細調整</span></div>
+        <div class="phone"><div class="notch"></div><div class="scr">
+          <div class="sb"><span>20:33</span><span class="rt"><span>5G</span><span class="mono">61%</span></span></div>
+          <div class="nav"><span class="back"><svg viewBox="0 0 9 14" fill="none" stroke="#4f46e5" stroke-width="2"><path d="M8 1 1 7l7 6"/></svg>設定</span><span class="title">教科・難易度</span><span class="spacer"></span></div>
+          <div class="bd">
+            <div class="glabel">出題教科</div>
+            <div class="group">
+              <div class="row"><span class="lbl">数学</span><span class="tg on ind"></span></div>
+              <div class="row"><span class="lbl">英語</span><span class="tg"></span></div>
+              <div class="row"><span class="lbl">理科</span><span class="tg"></span></div>
+            </div>
+            <div class="glabel">数学の範囲</div>
+            <div class="group">
+              <div class="row"><span class="lbl">二次関数</span><span class="val" style="color:var(--ok);">出題中</span></div>
+              <div class="row"><span class="lbl">三角比</span><span class="val">停止中</span></div>
+              <div class="row"><span class="lbl">数列</span><span class="val">停止中</span></div>
+            </div>
+            <div class="glabel">難易度</div>
+            <div style="padding:0 14px;"><div class="seg"><span>やさしい</span><span class="on">標準</span><span>応用</span></div></div>
+          </div>
+        </div></div>
+      </div>
+
+      <!-- C5 -->
+      <div class="cell">
+        <div class="cap"><span class="id">C5</span><span class="nm">合格条件</span><span class="ds">出題数・正解数・再挑戦</span></div>
+        <div class="phone"><div class="notch"></div><div class="scr">
+          <div class="sb"><span>20:34</span><span class="rt"><span>5G</span><span class="mono">60%</span></span></div>
+          <div class="nav"><span class="back"><svg viewBox="0 0 9 14" fill="none" stroke="#4f46e5" stroke-width="2"><path d="M8 1 1 7l7 6"/></svg>設定</span><span class="title">合格条件</span><span class="act">🔒</span></div>
+          <div class="bd pad">
+            <div style="background:#fff;border:1px solid var(--app-line);border-radius:12px;padding:13px 15px;display:flex;align-items:center;justify-content:space-between;"><span style="font-size:14px;font-weight:500;">出題数</span><div class="step"><b>−</b><span>10</span><b>+</b></div></div>
+            <div style="background:#fff;border:1px solid var(--app-line);border-radius:12px;padding:13px 15px;display:flex;align-items:center;justify-content:space-between;"><span style="font-size:14px;font-weight:500;">解除に必要な正解</span><div class="step"><b>−</b><span>8</span><b>+</b></div></div>
+            <div class="group inset" style="margin:0;">
+              <div class="row"><span class="lbl">再挑戦を許可<small>不正解の類題で取り返す</small></span><span class="tg on ind"></span></div>
+              <div class="row"><span class="lbl">ヒント使用で減点</span><span class="tg"></span></div>
+            </div>
+            <div class="strip ind"><span class="t">現在の条件</span><span class="v">10問中8問（80%）で解除／再挑戦あり</span></div>
+            <p class="p-xs">🔒 この設定の変更には保護者パスコードが必要です。</p>
+          </div>
+        </div></div>
+      </div>
+
+      <!-- C6 -->
+      <div class="cell">
+        <div class="cap"><span class="id">C6</span><span class="nm">通知</span><span class="ds">予告・開始・解除の通知</span></div>
+        <div class="phone"><div class="notch"></div><div class="scr">
+          <div class="sb"><span>20:35</span><span class="rt"><span>5G</span><span class="mono">60%</span></span></div>
+          <div class="nav"><span class="back"><svg viewBox="0 0 9 14" fill="none" stroke="#4f46e5" stroke-width="2"><path d="M8 1 1 7l7 6"/></svg>設定</span><span class="title">通知</span><span class="spacer"></span></div>
+          <div class="bd">
+            <div class="glabel">リマインド</div>
+            <div class="group">
+              <div class="row"><span class="lbl">ロック前の予告<small>15分前・5分前</small></span><span class="tg on"></span></div>
+              <div class="row"><span class="lbl">16:00 開始のお知らせ</span><span class="tg on"></span></div>
+              <div class="row"><span class="lbl">未達成のリマインド<small>夜に再通知</small></span><span class="tg on"></span></div>
+            </div>
+            <div class="glabel">サウンド</div>
+            <div class="group"><div class="row"><span class="lbl">通知音</span><span class="val">標準</span><span class="chev"><svg viewBox="0 0 8 13" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 1l6 5.5L1 12"/></svg></span></div></div>
+          </div>
+        </div></div>
+      </div>
+
+      <!-- C7 -->
+      <div class="cell">
+        <div class="cap"><span class="id">C7</span><span class="nm">保護者ロック / パスコード</span><span class="ds">改変防止の暗証番号</span></div>
+        <div class="phone"><div class="notch"></div><div class="scr">
+          <div class="sb"><span>20:36</span><span class="rt"><span>5G</span><span class="mono">59%</span></span></div>
+          <div class="nav"><span class="back"><svg viewBox="0 0 9 14" fill="none" stroke="#4f46e5" stroke-width="2"><path d="M8 1 1 7l7 6"/></svg>設定</span><span class="title">保護者ロック</span><span class="spacer"></span></div>
+          <div class="bd">
+            <div class="glabel">保護のスイッチ</div>
+            <div class="group">
+              <div class="row"><span class="lbl">パスコードで保護</span><span class="tg on ind"></span></div>
+            </div>
+            <div class="glabel">パスコードで守る操作</div>
+            <div class="group">
+              <div class="row"><span class="lbl">合格条件の変更</span><span class="tg on"></span></div>
+              <div class="row"><span class="lbl">スケジュールの変更</span><span class="tg on"></span></div>
+              <div class="row"><span class="lbl">対象アプリの解除</span><span class="tg on"></span></div>
+              <div class="row"><span class="lbl">アプリの削除</span><span class="tg on"></span></div>
+            </div>
+            <div class="group inset"><div class="row"><span class="lbl" style="color:var(--accent);">パスコードを変更</span><span class="chev"><svg viewBox="0 0 8 13" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 1l6 5.5L1 12"/></svg></span></div></div>
+          </div>
+        </div></div>
+      </div>
+
+      <!-- C8 -->
+      <div class="cell">
+        <div class="cap"><span class="id">C8</span><span class="nm">アカウント</span><span class="ds">プロフィール・連携・退会</span></div>
+        <div class="phone"><div class="notch"></div><div class="scr">
+          <div class="sb"><span>20:37</span><span class="rt"><span>5G</span><span class="mono">59%</span></span></div>
+          <div class="nav"><span class="back"><svg viewBox="0 0 9 14" fill="none" stroke="#4f46e5" stroke-width="2"><path d="M8 1 1 7l7 6"/></svg>設定</span><span class="title">アカウント</span><span class="spacer"></span></div>
+          <div class="bd">
+            <div style="display:flex;align-items:center;gap:12px;padding:16px;">
+              <span style="width:48px;height:48px;border-radius:50%;background:var(--accent-soft);display:grid;place-items:center;color:var(--accent);font-weight:700;">R</span>
+              <div><div style="font-weight:700;font-size:15px;">りく</div><div class="p-xs">高校1年・数学</div></div>
+            </div>
+            <div class="group">
+              <div class="row"><span class="lbl">プロフィール編集</span><span class="chev"><svg viewBox="0 0 8 13" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 1l6 5.5L1 12"/></svg></span></div>
+              <div class="row"><span class="lbl">保護者と連携</span><span class="val" style="color:var(--ok);">連携済み</span><span class="chev"><svg viewBox="0 0 8 13" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 1l6 5.5L1 12"/></svg></span></div>
+            </div>
+            <div class="glabel">その他</div>
+            <div class="group">
+              <div class="row"><span class="lbl">ヘルプ</span><span class="chev"><svg viewBox="0 0 8 13" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 1l6 5.5L1 12"/></svg></span></div>
+              <div class="row"><span class="lbl" style="color:var(--bad);">ログアウト</span></div>
+            </div>
+          </div>
+        </div></div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ===================== D. RECORDS ===================== -->
+  <section class="sect">
+    <div class="sect-head"><span class="sect-id">D</span><h2>学習・記録</h2><span class="cnt">4 screens</span></div>
+    <p class="sect-desc">「続けられている実感」と「間違いの振り返り」を支える画面群。連続達成・正答率の推移、間違い直しノート、問題ごとの解説を確認できます。</p>
+    <div class="gal">
+
+      <!-- D1 -->
+      <div class="cell">
+        <div class="cap"><span class="id">D1</span><span class="nm">学習タブ（今日 / 履歴）</span><span class="ds">日々のミッション一覧</span></div>
+        <div class="phone"><div class="notch"></div><div class="scr">
+          <div class="sb"><span>21:02</span><span class="rt"><span>5G</span><span class="mono">55%</span></span></div>
+          <div class="ltitle">学習</div>
+          <div class="bd">
+            <div style="padding:0 14px 8px;"><div class="seg"><span class="on">今日</span><span>履歴</span></div></div>
+            <div class="group inset" style="margin-bottom:12px;">
+              <div class="row"><span class="lbl">6/8（昨日）</span><span class="val" style="color:var(--ok);">達成</span></div>
+              <div class="row"><span class="lbl">6/8（2日前）</span><span class="val" style="color:var(--ok);">達成</span></div>
+              <div class="row"><span class="lbl">5/8（3日前）</span><span class="val" style="color:var(--bad);">未達</span></div>
+              <div class="row"><span class="lbl">8/8（4日前）</span><span class="val" style="color:var(--ok);">達成</span></div>
+            </div>
+            <div class="glabel">連続達成</div>
+            <div style="padding:0 14px;"><div class="strip ind" style="flex-direction:row;align-items:baseline;gap:8px;"><span class="big-time" style="font-size:30px;color:var(--accent-ink);">12</span><span class="v">日連続で解除しています</span></div></div>
+          </div>
+          <div class="tabbar">
+            <span class="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-7 9 7"/><path d="M5 10v9h14v-9"/></svg>ホーム</span>
+            <span class="tab on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16M4 12h16M4 19h10"/></svg>学習</span>
+            <span class="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h13l3 3v13H4z"/><path d="M8 9h8M8 13h6"/></svg>復習</span>
+            <span class="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg>設定</span>
+          </div>
+        </div></div>
+      </div>
+
+      <!-- D2 -->
+      <div class="cell">
+        <div class="cap"><span class="id">D2</span><span class="nm">復習ノート（間違い直し）</span><span class="ds">間違えた問題の蓄積</span></div>
+        <div class="phone"><div class="notch"></div><div class="scr">
+          <div class="sb"><span>21:05</span><span class="rt"><span>5G</span><span class="mono">54%</span></span></div>
+          <div class="ltitle">復習</div>
+          <div class="bd">
+            <div class="glabel">苦手な単元</div>
+            <div class="group inset" style="margin-bottom:12px;">
+              <div class="row"><span class="lbl">平方完成<small>誤答 4回</small></span><span class="val" style="color:var(--bad);">要復習</span><span class="chev"><svg viewBox="0 0 8 13" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 1l6 5.5L1 12"/></svg></span></div>
+              <div class="row"><span class="lbl">最小値<small>誤答 2回</small></span><span class="val" style="color:var(--warn);">注意</span><span class="chev"><svg viewBox="0 0 8 13" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 1l6 5.5L1 12"/></svg></span></div>
+            </div>
+            <div class="glabel">最近の間違い</div>
+            <div class="group">
+              <div class="row"><span class="lbl" style="font-size:13px;">y=x²−4x+3 の頂点</span><span class="chev"><svg viewBox="0 0 8 13" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 1l6 5.5L1 12"/></svg></span></div>
+              <div class="row"><span class="lbl" style="font-size:13px;">放物線の軸</span><span class="chev"><svg viewBox="0 0 8 13" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 1l6 5.5L1 12"/></svg></span></div>
+            </div>
+            <div style="padding:12px 14px 0;"><a class="btn pri block sm">苦手だけ10問やる</a></div>
+          </div>
+          <div class="tabbar">
+            <span class="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-7 9 7"/><path d="M5 10v9h14v-9"/></svg>ホーム</span>
+            <span class="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16M4 12h16M4 19h10"/></svg>学習</span>
+            <span class="tab on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h13l3 3v13H4z"/><path d="M8 9h8M8 13h6"/></svg>復習</span>
+            <span class="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg>設定</span>
+          </div>
+        </div></div>
+      </div>
+
+      <!-- D3 -->
+      <div class="cell">
+        <div class="cap"><span class="id">D3</span><span class="nm">統計・カレンダー</span><span class="ds">達成カレンダーと推移</span></div>
+        <div class="phone"><div class="notch"></div><div class="scr">
+          <div class="sb"><span>21:08</span><span class="rt"><span>5G</span><span class="mono">53%</span></span></div>
+          <div class="nav"><span class="back"><svg viewBox="0 0 9 14" fill="none" stroke="#4f46e5" stroke-width="2"><path d="M8 1 1 7l7 6"/></svg>学習</span><span class="title">記録</span><span class="spacer"></span></div>
+          <div class="bd pad">
+            <div class="glabel" style="padding-left:2px;">6月</div>
+            <div class="cal">
+              <div class="d done">2</div><div class="d done">3</div><div class="d miss">4</div><div class="d done">5</div><div class="d done">6</div><div class="d done">7</div><div class="d today">8</div>
+              <div class="d">9</div><div class="d">10</div><div class="d">11</div><div class="d">12</div><div class="d">13</div><div class="d">14</div><div class="d">15</div>
+            </div>
+            <div class="glabel" style="padding-left:2px;">週ごとの正答率</div>
+            <div class="chart"><span class="bar" style="height:50%;"></span><span class="bar" style="height:70%;"></span><span class="bar dim" style="height:45%;"></span><span class="bar" style="height:80%;"></span><span class="bar" style="height:90%;"></span></div>
+            <div class="group inset" style="margin:0;">
+              <div class="row"><span class="lbl">平均正答率</span><span class="val">74%</span></div>
+              <div class="row"><span class="lbl">最長連続</span><span class="val">12日</span></div>
+            </div>
+          </div>
+        </div></div>
+      </div>
+
+      <!-- D4 -->
+      <div class="cell">
+        <div class="cap"><span class="id">D4</span><span class="nm">問題・解説の詳細</span><span class="ds">自分の解答と正答の比較</span></div>
+        <div class="phone"><div class="notch"></div><div class="scr">
+          <div class="sb"><span>21:10</span><span class="rt"><span>5G</span><span class="mono">52%</span></span></div>
+          <div class="nav"><span class="back"><svg viewBox="0 0 9 14" fill="none" stroke="#4f46e5" stroke-width="2"><path d="M8 1 1 7l7 6"/></svg>復習</span><span class="title">解説</span><span class="act">✦</span></div>
+          <div class="bd pad" style="background:#fff;">
+            <div class="qbody" style="flex:none;"><span class="qno">二次関数 · 頂点</span><div class="formula">y = x² − 4x + 3 の頂点</div></div>
+            <div class="glabel" style="padding-left:2px;">あなたの解答（撮影）</div>
+            <div class="scanbox"><div class="scanimg" style="height:80px;"></div></div>
+            <div class="strip bad"><span class="t">つまずき</span><span class="v">定数項の符号。−4²/4 の計算で +1 にしている。</span></div>
+            <div class="strip ok"><span class="t">解説</span><span class="v">y=(x−2)²−1 → 頂点 (2, −1)。</span></div>
+            <a class="btn sec block sm">似た問題をもう1問</a>
+          </div>
+        </div></div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ===================== FOOTER ===================== -->
+  <div class="foot">
+    <h3>確認したい論点 / 次のステップ</h3>
+    <ol>
+      <li><b>合否の数え方</b>：初回10問だけで判定 or 再挑戦込みの累計8問（本案は累計）。</li>
+      <li><b>再挑戦の出題</b>：同一問題 or 類題（本案は類題）。</li>
+      <li><b>AI採点が読めない時</b>：再撮影 / 手動入力 / スキップのどれを既定に。</li>
+      <li><b>予習の扱い</b>：16時前にミッションを前倒しで解けるようにするか。</li>
+      <li><b>保護者の関与</b>：パスコードのみ or 別アプリで進捗を見せるか。</li>
+    </ol>
+    <p class="sect-desc" style="margin-top:18px;">この28画面の構成・粒度でよければ、次は<b style="color:var(--accent-ink)">主要画面を実機フレームでハイファイ化</b>、あるいは<b style="color:var(--accent-ink)">タップで動くプロトタイプ</b>に進めます。足したい画面・直したい遷移があれば指定してください。</p>
+  </div>
+
+</div>
+
+<style>
+  /* small inline helpers used above */
+  .pillday{flex:1;text-align:center;font-size:12px;font-weight:600;padding:9px 0;border-radius:8px;background:#eef0f4;color:var(--app-2);}
+  .pillday.on{background:var(--accent);color:#fff;}
+  .pin{width:42px;height:50px;border:1.5px solid var(--app-line);border-radius:10px;display:grid;place-items:center;font-size:18px;color:var(--app-ink);background:#fff;}
+  .pin.on{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);}
+</style>
+</body>
+</html>

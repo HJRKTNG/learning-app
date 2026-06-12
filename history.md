@@ -1,5 +1,11 @@
 # history.md
 
+## 2026-06-12
+
+- GitHubリモート `https://github.com/HJRKTNG/learning-app` を `origin` として登録し、`main` ブランチをpushして共同開発できるようにした。
+- リポジトリ直下に `.gitignore` を追加し、`.DS_Store` を追跡対象から除外。
+- UI設計資料 `学習アプリワークフロー/`（UIマップHTML、ワイヤーフロー、スクリーンショット）をリポジトリに追加し、共同開発者が参照できるようにした。
+
 ## 2026-05-23
 
 - 作業開始時点で既存のReact Nativeプロジェクト、iosディレクトリ、package.json、Podfile、Xcode workspace/project、Gitリポジトリが存在しないことを確認。
