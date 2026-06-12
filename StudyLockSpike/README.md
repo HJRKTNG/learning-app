@@ -82,7 +82,7 @@ npm run ocr:handwriting -- --limit 5
 npm run ocr:handwriting -- --limit 1 --max-blocks 2 --output tmp/ocr-handwriting/segmented-sample.json
 ```
 
-処理は `粗OCR/レイアウト解析 → 問題範囲のクロップ → クロップ別OCR → 補正候補/論理検査` の3段階です。全件を流す場合は `--limit` と `--max-blocks` を外します。出力先を固定したい場合は `--output tmp/ocr-handwriting/latest.json` を付けてください。
+処理は `粗OCR/レイアウト解析 → 空白境界へ寄せた問題範囲クロップ → クロップ別OCR → 補正候補/論理検査` の3段階です。クロップ時は行/列のインク密度から空白帯を探し、手書き文字や数式を跨ぐ切断、隣ブロックの混入を避けるように補正します。全件を流す場合は `--limit` と `--max-blocks` を外します。出力先を固定したい場合は `--output tmp/ocr-handwriting/latest.json` を付けてください。
 
 # Getting Started
 

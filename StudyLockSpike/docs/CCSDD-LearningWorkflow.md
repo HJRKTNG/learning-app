@@ -37,14 +37,14 @@
 ### 推奨アーキテクチャ
 
 1. Phase 1: Webブラウザでカメラ撮影/画像アップロード/手動入力を実装し、採点サービス境界を固定する。
-2. Phase 2: Gemini 2.5 Flashで実素材を3段階OCRする。まずページ全体から問題ごとの範囲を検出し、`sharp` で余白つきクロップを作成する。次にクロップ画像ごとに詳細OCRし、最後にrawを保持したまま補正候補・記号ジャンプ・手書きミス候補をフラグ化する。必要ならMathpixなどのSTEM OCR APIと比較する。
+2. Phase 2: Gemini 2.5 Flashで実素材を3段階OCRする。まずページ全体から問題ごとの範囲を検出し、`sharp` とインク密度解析で空白境界へ寄せたクロップを作成する。次にクロップ画像ごとに詳細OCRし、最後にrawを保持したまま補正候補・記号ジャンプ・手書きミス候補をフラグ化する。必要ならMathpixなどのSTEM OCR APIと比較する。
 3. Phase 3: OCR結果、正答、問題文、採点基準をAI採点APIへ渡し、JSON schemaで正誤・部分点・解説を返す。
 4. Phase 4: iOS実機ではVisionで前処理と一般OCRを補助し、数式はSTEM OCRへフォールバックする。
 
 ## Development
 
 - 今回はPhase 1として、Web上で実カメラ/アップロード/手動入力を動かし、生成問題とTeX表示に接続する。
-- 手描き素材検証は `npm run ocr:handwriting -- --limit 1 --max-blocks 2 --output tmp/ocr-handwriting/segmented-sample.json` で少数ブロックから開始する。`GEMINI_API_KEY` または `GOOGLE_API_KEY` を `.env.local` に置くと、`gemini-2.5-flash` がレイアウト、クロップ別OCR、補正候補をJSON/Markdown/HTMLへ保存する。
+- 手描き素材検証は `npm run ocr:handwriting -- --limit 1 --max-blocks 2 --output tmp/ocr-handwriting/segmented-sample.json` で少数ブロックから開始する。`GEMINI_API_KEY` または `GOOGLE_API_KEY` を `.env.local` に置くと、`gemini-2.5-flash` がレイアウト、空白境界クロップ、クロップ別OCR、補正候補をJSON/Markdown/HTMLへ保存する。
 - 採点はローカルの `gradeCapturedAnswer` で疑似AI判定を行う。外部AI採点へ移行してもUIは変更しない。
 - 検証は `lint`、`tsc`、`jest`、`web:build`、Chromeヘッドレス表示確認で行う。
 

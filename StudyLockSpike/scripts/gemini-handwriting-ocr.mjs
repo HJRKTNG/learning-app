@@ -12,8 +12,12 @@ const repoRoot = path.resolve(projectRoot, '..');
 
 const DEFAULT_MODEL = 'gemini-2.5-flash';
 const DEFAULT_DELAY_MS = 800;
-const DEFAULT_PADDING_RATIO = 0.045;
+const DEFAULT_PADDING_RATIO = 0.07;
 const BBOX_SCALE = 1000;
+const INK_LUMINANCE_THRESHOLD = 150;
+const HORIZONTAL_BLANK_DENSITY = 0.012;
+const VERTICAL_BLANK_DENSITY = 0.02;
+const MIN_BLANK_BAND_PX = 10;
 const SUPPORTED_EXTENSIONS = new Set([
   '.jpg',
   '.jpeg',
@@ -292,7 +296,9 @@ const LAYOUT_PROMPT = [
   'Prefer problem-number blocks such as 問題7, 問題8, 問題15, etc.',
   'If headings are unclear, use visual separation, blank space, indentation, and line flow.',
   'Do not solve or correct math. Coarse text is only for orientation.',
-  'Make boxes slightly generous so no handwriting is cut off.',
+  'Every bounding-box boundary must pass through blank whitespace. Never split through handwriting, formulas, punctuation, or a problem heading.',
+  'If there is no blank whitespace between two visible groups, merge them into one block rather than cutting through text.',
+  'Make boxes slightly generous so no handwriting is cut off, but do not include the next problem heading after a blank separator.',
   'Return only JSON matching the schema.',
 ].join('\n');
 
@@ -643,6 +649,31 @@ const sanitizeName = value =>
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
+const bboxToRawPixels = ({ bbox, imageHeight, imageWidth }) => {
+  const left = Math.floor(clamp((bbox.x / BBOX_SCALE) * imageWidth, 0, imageWidth - 1));
+  const top = Math.floor(clamp((bbox.y / BBOX_SCALE) * imageHeight, 0, imageHeight - 1));
+  const right = Math.ceil(
+    clamp(((bbox.x + bbox.width) / BBOX_SCALE) * imageWidth, left + 1, imageWidth),
+  );
+  const bottom = Math.ceil(
+    clamp(((bbox.y + bbox.height) / BBOX_SCALE) * imageHeight, top + 1, imageHeight),
+  );
+
+  return {
+    height: Math.max(1, bottom - top),
+    left,
+    top,
+    width: Math.max(1, right - left),
+  };
+};
+
+const cropToNormalizedBbox = ({ crop, imageHeight, imageWidth }) => ({
+  height: Math.round((crop.height / imageHeight) * BBOX_SCALE),
+  width: Math.round((crop.width / imageWidth) * BBOX_SCALE),
+  x: Math.round((crop.left / imageWidth) * BBOX_SCALE),
+  y: Math.round((crop.top / imageHeight) * BBOX_SCALE),
+});
+
 const bboxToPixels = ({ bbox, imageHeight, imageWidth, paddingRatio }) => {
   const rawLeft = (bbox.x / BBOX_SCALE) * imageWidth;
   const rawTop = (bbox.y / BBOX_SCALE) * imageHeight;
@@ -663,6 +694,726 @@ const bboxToPixels = ({ bbox, imageHeight, imageWidth, paddingRatio }) => {
     left,
     top,
     width: Math.max(1, right - left),
+  };
+};
+
+const isInk = value => value < INK_LUMINANCE_THRESHOLD;
+
+const createWhitespaceAnalyzer = async pageFile => {
+  const { data, info } = await sharp(pageFile)
+    .greyscale()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const width = info.width;
+  const height = info.height;
+
+  const safeX = value => clamp(Math.round(value), 0, width - 1);
+  const safeY = value => clamp(Math.round(value), 0, height - 1);
+
+  const rowInkDensity = ({ left, right, y }) => {
+    const row = safeY(y);
+    const x1 = safeX(Math.min(left, right));
+    const x2 = safeX(Math.max(left, right));
+    let ink = 0;
+    let count = 0;
+    for (let x = x1; x <= x2; x += 1) {
+      if (isInk(data[row * width + x])) {
+        ink += 1;
+      }
+      count += 1;
+    }
+    return count > 0 ? ink / count : 0;
+  };
+
+  const columnInkDensity = ({ bottom, top, x }) => {
+    const column = safeX(x);
+    const y1 = safeY(Math.min(top, bottom));
+    const y2 = safeY(Math.max(top, bottom));
+    let ink = 0;
+    let count = 0;
+    for (let y = y1; y <= y2; y += 1) {
+      if (isInk(data[y * width + column])) {
+        ink += 1;
+      }
+      count += 1;
+    }
+    return count > 0 ? ink / count : 0;
+  };
+
+  return {
+    columnInkDensity,
+    height,
+    rowInkDensity,
+    width,
+  };
+};
+
+const findBlankBands = ({
+  densityAt,
+  densityThreshold,
+  from,
+  minBandPx = MIN_BLANK_BAND_PX,
+  to,
+}) => {
+  const start = Math.max(0, Math.floor(Math.min(from, to)));
+  const end = Math.floor(Math.max(from, to));
+  const bands = [];
+  let bandStart = null;
+
+  for (let position = start; position <= end; position += 1) {
+    const blank = densityAt(position) <= densityThreshold;
+    if (blank && bandStart === null) {
+      bandStart = position;
+    }
+    if ((!blank || position === end) && bandStart !== null) {
+      const bandEnd = blank && position === end ? position : position - 1;
+      if (bandEnd - bandStart + 1 >= minBandPx) {
+        bands.push({
+          center: Math.round((bandStart + bandEnd) / 2),
+          end: bandEnd,
+          start: bandStart,
+        });
+      }
+      bandStart = null;
+    }
+  }
+
+  return bands;
+};
+
+const nearestBand = ({ bands, target }) => {
+  if (bands.length === 0) {
+    return null;
+  }
+  return bands.reduce((best, band) =>
+    Math.abs(band.center - target) < Math.abs(best.center - target) ? band : best,
+  );
+};
+
+const widestBand = ({ bands, target }) => {
+  if (bands.length === 0) {
+    return null;
+  }
+  return bands.reduce((best, band) => {
+    const bandWidth = band.end - band.start;
+    const bestWidth = best.end - best.start;
+    if (bandWidth !== bestWidth) {
+      return bandWidth > bestWidth ? band : best;
+    }
+    return Math.abs(band.center - target) < Math.abs(best.center - target)
+      ? band
+      : best;
+  });
+};
+
+const findColumnSeparator = analyzer => {
+  const from = Math.floor(analyzer.width * 0.35);
+  const to = Math.floor(analyzer.width * 0.65);
+  const bands = findBlankBands({
+    densityAt: x =>
+      analyzer.columnInkDensity({
+        bottom: Math.floor(analyzer.height * 0.96),
+        top: Math.floor(analyzer.height * 0.04),
+        x,
+      }),
+    densityThreshold: VERTICAL_BLANK_DENSITY,
+    from,
+    minBandPx: 24,
+    to,
+  });
+  const band = widestBand({
+    bands,
+    target: Math.floor(analyzer.width / 2),
+  });
+  if (!band || band.end - band.start < 24) {
+    return null;
+  }
+  return {
+    ...band,
+    x: band.center,
+  };
+};
+
+const horizontalOverlapRatio = (a, b) => {
+  const overlap = Math.max(
+    0,
+    Math.min(a.left + a.width, b.left + b.width) - Math.max(a.left, b.left),
+  );
+  return overlap / Math.max(1, Math.min(a.width, b.width));
+};
+
+const verticalOverlapRatio = (a, b) => {
+  const overlap = Math.max(
+    0,
+    Math.min(a.top + a.height, b.top + b.height) - Math.max(a.top, b.top),
+  );
+  return overlap / Math.max(1, Math.min(a.height, b.height));
+};
+
+const findNeighbor = ({ direction, rawBlocks, target }) => {
+  const targetCenterX = target.raw.left + target.raw.width / 2;
+  const targetCenterY = target.raw.top + target.raw.height / 2;
+  const candidates = rawBlocks
+    .filter(block => block !== target)
+    .filter(block => {
+      const centerX = block.raw.left + block.raw.width / 2;
+      const centerY = block.raw.top + block.raw.height / 2;
+      if (direction === 'previous') {
+        return centerY < targetCenterY && horizontalOverlapRatio(target.raw, block.raw) > 0.22;
+      }
+      if (direction === 'next') {
+        return centerY > targetCenterY && horizontalOverlapRatio(target.raw, block.raw) > 0.22;
+      }
+      if (direction === 'left') {
+        return centerX < targetCenterX && verticalOverlapRatio(target.raw, block.raw) > 0.18;
+      }
+      return centerX > targetCenterX && verticalOverlapRatio(target.raw, block.raw) > 0.18;
+    });
+
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  return candidates.reduce((best, block) => {
+    const blockCenterX = block.raw.left + block.raw.width / 2;
+    const blockCenterY = block.raw.top + block.raw.height / 2;
+    const bestCenterX = best.raw.left + best.raw.width / 2;
+    const bestCenterY = best.raw.top + best.raw.height / 2;
+
+    if (direction === 'previous' || direction === 'next') {
+      return Math.abs(blockCenterY - targetCenterY) <
+        Math.abs(bestCenterY - targetCenterY)
+        ? block
+        : best;
+    }
+
+    return Math.abs(blockCenterX - targetCenterX) <
+      Math.abs(bestCenterX - targetCenterX)
+      ? block
+      : best;
+  });
+};
+
+const edgeHasInk = ({ analyzer, crop, edge }) => {
+  const densityCrop = crop.densityCrop || crop;
+  if (edge === 'top' || edge === 'bottom') {
+    const y = edge === 'top' ? crop.top : crop.top + crop.height - 1;
+    return (
+      analyzer.rowInkDensity({
+        left: densityCrop.left,
+        right: densityCrop.left + densityCrop.width - 1,
+        y,
+      }) > HORIZONTAL_BLANK_DENSITY
+    );
+  }
+
+  const x = edge === 'left' ? crop.left : crop.left + crop.width - 1;
+  return (
+    analyzer.columnInkDensity({
+      bottom: densityCrop.top + densityCrop.height - 1,
+      top: densityCrop.top,
+      x,
+    }) > VERTICAL_BLANK_DENSITY
+  );
+};
+
+const snapBoundaryToBlank = ({
+  analyzer,
+  crop,
+  densityCrop = crop,
+  edge,
+  preference = 'nearest',
+  maxPosition,
+  minPosition,
+  searchTarget,
+}) => {
+  if (edge === 'top' || edge === 'bottom') {
+    const bands = findBlankBands({
+      densityAt: y =>
+        analyzer.rowInkDensity({
+          left: densityCrop.left,
+          right: densityCrop.left + densityCrop.width - 1,
+          y,
+        }),
+      densityThreshold: HORIZONTAL_BLANK_DENSITY,
+      from: minPosition,
+      to: maxPosition,
+    });
+    const band =
+      preference === 'widest'
+        ? widestBand({ bands, target: searchTarget })
+        : nearestBand({ bands, target: searchTarget });
+    if (!band) {
+      return null;
+    }
+    return edge === 'top' ? band.end + 1 : band.start;
+  }
+
+  const bands = findBlankBands({
+    densityAt: x =>
+      analyzer.columnInkDensity({
+        bottom: densityCrop.top + densityCrop.height - 1,
+        top: densityCrop.top,
+        x,
+      }),
+    densityThreshold: VERTICAL_BLANK_DENSITY,
+    from: minPosition,
+    to: maxPosition,
+    minBandPx: Math.max(8, Math.floor(MIN_BLANK_BAND_PX * 0.8)),
+  });
+  const band =
+    preference === 'widest'
+      ? widestBand({ bands, target: searchTarget })
+      : nearestBand({ bands, target: searchTarget });
+  if (!band) {
+    return null;
+  }
+  return edge === 'left' ? band.end + 1 : band.start;
+};
+
+const findInkBounds = ({ analyzer, region }) => {
+  const horizontalThreshold = Math.max(0.004, HORIZONTAL_BLANK_DENSITY * 0.6);
+  const verticalThreshold = Math.max(0.004, VERTICAL_BLANK_DENSITY * 0.45);
+  const left = clamp(region.left, 0, analyzer.width - 1);
+  const right = clamp(region.left + region.width - 1, left, analyzer.width - 1);
+  const top = clamp(region.top, 0, analyzer.height - 1);
+  const bottom = clamp(region.top + region.height - 1, top, analyzer.height - 1);
+  let firstRow = null;
+  let lastRow = null;
+  let firstColumn = null;
+  let lastColumn = null;
+
+  for (let y = top; y <= bottom; y += 1) {
+    const density = analyzer.rowInkDensity({ left, right, y });
+    if (density > horizontalThreshold) {
+      firstRow = firstRow ?? y;
+      lastRow = y;
+    }
+  }
+
+  for (let x = left; x <= right; x += 1) {
+    const density = analyzer.columnInkDensity({ bottom, top, x });
+    if (density > verticalThreshold) {
+      firstColumn = firstColumn ?? x;
+      lastColumn = x;
+    }
+  }
+
+  if (
+    firstRow === null ||
+    lastRow === null ||
+    firstColumn === null ||
+    lastColumn === null
+  ) {
+    return null;
+  }
+
+  return {
+    bottom: lastRow,
+    left: firstColumn,
+    right: lastColumn,
+    top: firstRow,
+  };
+};
+
+const refineCropToWhitespace = ({
+  analyzer,
+  blockInfo,
+  columnSeparator,
+  imageHeight,
+  imageWidth,
+  initialCrop,
+  rawBlocks,
+}) => {
+  const crop = { ...initialCrop };
+  const target = blockInfo;
+  const previous = findNeighbor({ direction: 'previous', rawBlocks, target });
+  const next = findNeighbor({ direction: 'next', rawBlocks, target });
+  const leftNeighbor = findNeighbor({ direction: 'left', rawBlocks, target });
+  const rightNeighbor = findNeighbor({ direction: 'right', rawBlocks, target });
+  const notes = [];
+  const inkBounds = findInkBounds({
+    analyzer,
+    region: target.raw,
+  });
+  const previousInkBounds = previous
+    ? findInkBounds({ analyzer, region: previous.raw })
+    : null;
+  const nextInkBounds = next
+    ? findInkBounds({ analyzer, region: next.raw })
+    : null;
+  const leftNeighborInkBounds = leftNeighbor
+    ? findInkBounds({ analyzer, region: leftNeighbor.raw })
+    : null;
+  const rightNeighborInkBounds = rightNeighbor
+    ? findInkBounds({ analyzer, region: rightNeighbor.raw })
+    : null;
+  const paddedInkBounds = findInkBounds({
+    analyzer,
+    region: initialCrop,
+  });
+  const bottomBodyInsetLeft = Math.floor(initialCrop.width * 0.16);
+  const bottomBodyInsetRight = Math.floor(initialCrop.width * 0.06);
+  const paddedBodyInkBounds = findInkBounds({
+    analyzer,
+    region: {
+      height: initialCrop.height,
+      left: initialCrop.left + bottomBodyInsetLeft,
+      top: initialCrop.top,
+      width: Math.max(
+        1,
+        initialCrop.width - bottomBodyInsetLeft - bottomBodyInsetRight,
+      ),
+    },
+  });
+  let leftSeparatorLimit = null;
+  let rightSeparatorLimit = null;
+  const horizontalDensityCrop = () => {
+    const margin = Math.max(6, Math.floor(target.raw.width * 0.12));
+    const left = clamp(target.raw.left + margin, 0, imageWidth - 1);
+    const right = clamp(target.raw.left + target.raw.width - margin, left + 1, imageWidth);
+    return {
+      height: crop.height,
+      left,
+      top: crop.top,
+      width: Math.max(1, right - left),
+    };
+  };
+  const verticalDensityCrop = () => {
+    const margin = Math.max(6, Math.floor(target.raw.height * 0.08));
+    const top = clamp(target.raw.top + margin, 0, imageHeight - 1);
+    const bottom = clamp(target.raw.top + target.raw.height - margin, top + 1, imageHeight);
+    return {
+      height: Math.max(1, bottom - top),
+      left: crop.left,
+      top,
+      width: crop.width,
+    };
+  };
+  const sideSeparatorDensityCrop = () => {
+    const topMargin = Math.max(8, Math.floor(target.raw.height * 0.32));
+    const bottomMargin = Math.max(4, Math.floor(target.raw.height * 0.06));
+    const top = clamp(target.raw.top + topMargin, 0, imageHeight - 1);
+    const bottom = clamp(
+      target.raw.top + target.raw.height - bottomMargin,
+      top + 1,
+      imageHeight,
+    );
+    return {
+      height: Math.max(1, bottom - top),
+      left: crop.left,
+      top,
+      width: crop.width,
+    };
+  };
+
+  const applyBoundary = (edge, value, reason) => {
+    if (value === null || value === undefined || !Number.isFinite(value)) {
+      return;
+    }
+    if (edge === 'top') {
+      const nextBottom = crop.top + crop.height;
+      const top = clamp(Math.round(value), 0, nextBottom - 1);
+      if (top !== crop.top) {
+        notes.push(`${edge}:${crop.top}->${top} ${reason}`);
+        crop.height = nextBottom - top;
+        crop.top = top;
+      }
+      return;
+    }
+    if (edge === 'bottom') {
+      const bottom = clamp(Math.round(value), crop.top + 1, imageHeight);
+      const currentBottom = crop.top + crop.height;
+      if (bottom !== currentBottom) {
+        notes.push(`${edge}:${currentBottom}->${bottom} ${reason}`);
+        crop.height = bottom - crop.top;
+      }
+      return;
+    }
+    if (edge === 'left') {
+      const nextRight = crop.left + crop.width;
+      const left = clamp(Math.round(value), 0, nextRight - 1);
+      if (left !== crop.left) {
+        notes.push(`${edge}:${crop.left}->${left} ${reason}`);
+        crop.width = nextRight - left;
+        crop.left = left;
+      }
+      return;
+    }
+    const right = clamp(Math.round(value), crop.left + 1, imageWidth);
+    const currentRight = crop.left + crop.width;
+    if (right !== currentRight) {
+      notes.push(`${edge}:${currentRight}->${right} ${reason}`);
+      crop.width = right - crop.left;
+    }
+  };
+
+  if (columnSeparator) {
+    const targetCenterX = target.raw.left + target.raw.width / 2;
+    if (targetCenterX < columnSeparator.x && crop.left + crop.width > columnSeparator.start) {
+      applyBoundary(
+        'right',
+        Math.max(columnSeparator.start - 4, crop.left + 1),
+        'page-column-separator',
+      );
+    } else if (targetCenterX > columnSeparator.x && crop.left < columnSeparator.end) {
+      applyBoundary(
+        'left',
+        Math.min(columnSeparator.end + 4, crop.left + crop.width - 1),
+        'page-column-separator',
+      );
+    }
+  }
+
+  const targetCenterX = target.raw.left + target.raw.width / 2;
+  if (targetCenterX > imageWidth * 0.52 && crop.left < imageWidth * 0.45) {
+    const densityCrop = sideSeparatorDensityCrop();
+    const bands = findBlankBands({
+      densityAt: x =>
+        analyzer.columnInkDensity({
+          bottom: densityCrop.top + densityCrop.height - 1,
+          top: densityCrop.top,
+          x,
+        }),
+      densityThreshold: VERTICAL_BLANK_DENSITY,
+      from: Math.floor(imageWidth * 0.38),
+      minBandPx: Math.max(8, Math.floor(MIN_BLANK_BAND_PX * 0.8)),
+      to: Math.min(
+        Math.floor(imageWidth * 0.58),
+        target.raw.left + Math.floor(target.raw.width * 0.25),
+      ),
+    });
+    const band = nearestBand({
+      bands,
+      target: Math.floor(imageWidth * 0.47),
+    });
+    if (band && band.start > crop.left) {
+      applyBoundary('left', band.start, 'page-column-gutter');
+    }
+  }
+
+  if (previous) {
+    const bandTop = previousInkBounds
+      ? previousInkBounds.bottom
+      : previous.raw.top + previous.raw.height;
+    const bandBottom = target.raw.top;
+    if (bandBottom - bandTop > MIN_BLANK_BAND_PX) {
+      applyBoundary(
+        'top',
+        snapBoundaryToBlank({
+          analyzer,
+          crop,
+          densityCrop: horizontalDensityCrop(),
+          edge: 'top',
+          maxPosition: bandBottom,
+          minPosition: bandTop,
+          searchTarget: target.raw.top,
+        }),
+        `prev=${previous.block.label}`,
+      );
+    }
+  }
+
+  if (next) {
+    const bandTop = target.raw.top + Math.floor(target.raw.height * 0.45);
+    const bandBottom = nextInkBounds ? nextInkBounds.top : next.raw.top;
+    if (bandBottom - bandTop > MIN_BLANK_BAND_PX) {
+      const candidate = snapBoundaryToBlank({
+        analyzer,
+        crop,
+        densityCrop: horizontalDensityCrop(),
+        edge: 'bottom',
+        maxPosition: bandBottom,
+        minPosition: bandTop,
+        searchTarget: next.raw.top,
+      });
+      applyBoundary(
+        'bottom',
+        candidate !== null && candidate < crop.top + crop.height ? candidate : null,
+        `next=${next.block.label}`,
+      );
+    }
+  }
+
+  if (leftNeighbor) {
+    const neighborRight = leftNeighborInkBounds
+      ? leftNeighborInkBounds.right
+      : leftNeighbor.raw.left + leftNeighbor.raw.width;
+    const separatorSearchPadding = Math.max(24, Math.floor(target.raw.width * 0.12));
+    const bandLeft = Math.min(neighborRight, target.raw.left) - separatorSearchPadding;
+    const bandRight = target.raw.left;
+    if (bandRight - bandLeft > MIN_BLANK_BAND_PX) {
+      const densityCrop = sideSeparatorDensityCrop();
+      const bands = findBlankBands({
+        densityAt: x =>
+          analyzer.columnInkDensity({
+            bottom: densityCrop.top + densityCrop.height - 1,
+            top: densityCrop.top,
+            x,
+          }),
+        densityThreshold: VERTICAL_BLANK_DENSITY,
+        from: Math.max(0, bandLeft),
+        minBandPx: Math.max(8, Math.floor(MIN_BLANK_BAND_PX * 0.8)),
+        to: Math.min(
+          bandRight + separatorSearchPadding,
+          crop.left + crop.width - 1,
+        ),
+      });
+      const band = nearestBand({ bands, target: crop.left });
+      const candidate = band ? band.start : null;
+      leftSeparatorLimit = candidate;
+      applyBoundary(
+        'left',
+        candidate !== null && candidate > crop.left
+          ? candidate
+          : candidate === null && crop.left < Math.max(bandLeft, target.raw.left)
+            ? Math.min(Math.max(bandLeft, target.raw.left) + 6, crop.left + crop.width - 1)
+            : null,
+        `left=${leftNeighbor.block.label}`,
+      );
+    }
+  }
+
+  if (rightNeighbor) {
+    const targetRight = target.raw.left + target.raw.width;
+    const neighborLeft = rightNeighborInkBounds
+      ? rightNeighborInkBounds.left
+      : rightNeighbor.raw.left;
+    const separatorSearchPadding = Math.max(24, Math.floor(target.raw.width * 0.12));
+    const bandLeft = targetRight - separatorSearchPadding;
+    const bandRight = Math.max(neighborLeft, targetRight) + separatorSearchPadding;
+    if (bandRight - bandLeft > MIN_BLANK_BAND_PX) {
+      const candidate = snapBoundaryToBlank({
+        analyzer,
+        crop,
+        densityCrop: sideSeparatorDensityCrop(),
+        edge: 'right',
+        maxPosition: Math.min(bandRight, crop.left + crop.width - 1),
+        minPosition: Math.max(0, bandLeft),
+        searchTarget: crop.left + crop.width - 1,
+      });
+      rightSeparatorLimit = candidate;
+      applyBoundary(
+        'right',
+        candidate !== null && candidate < crop.left + crop.width
+          ? candidate
+          : crop.left + crop.width >
+              Math.min(bandRight, target.raw.left + target.raw.width)
+            ? Math.max(
+                Math.min(bandRight, target.raw.left + target.raw.width) - 6,
+                crop.left + 1,
+              )
+            : null,
+        `right=${rightNeighbor.block.label}`,
+      );
+    }
+  }
+
+  for (const edge of ['top', 'bottom', 'left', 'right']) {
+    const densityCrop =
+      edge === 'top' || edge === 'bottom'
+        ? horizontalDensityCrop()
+        : verticalDensityCrop();
+    if (!edgeHasInk({ analyzer, crop: { ...crop, densityCrop }, edge })) {
+      continue;
+    }
+    const current =
+      edge === 'top'
+        ? crop.top
+        : edge === 'bottom'
+          ? crop.top + crop.height - 1
+          : edge === 'left'
+            ? crop.left
+            : crop.left + crop.width - 1;
+    const isHorizontal = edge === 'top' || edge === 'bottom';
+    const search = Math.max(24, Math.round((isHorizontal ? crop.height : crop.width) * 0.12));
+    const value = snapBoundaryToBlank({
+      analyzer,
+      crop,
+      densityCrop,
+      edge,
+      maxPosition:
+        edge === 'top' || edge === 'left'
+          ? current
+          : Math.min(isHorizontal ? imageHeight - 1 : imageWidth - 1, current + search),
+      minPosition:
+        edge === 'top' || edge === 'left'
+          ? Math.max(0, current - search)
+          : current,
+      searchTarget: current,
+    });
+    applyBoundary(edge, value, 'edge-ink');
+  }
+
+  if (inkBounds) {
+    const verticalGuard = Math.max(8, Math.floor(target.raw.height * 0.035));
+    const horizontalGuard = Math.max(4, Math.floor(target.raw.width * 0.012));
+    const verticalNeighborBuffer = Math.max(6, Math.floor(target.raw.height * 0.015));
+    const horizontalNeighborBuffer = Math.max(12, Math.floor(target.raw.width * 0.025));
+    const leftInkBounds =
+      leftNeighbor && paddedInkBounds ? paddedInkBounds : inkBounds;
+    const bottomInkBounds =
+      next && paddedBodyInkBounds ? paddedBodyInkBounds : inkBounds;
+    const topLimit = previous
+      ? (previousInkBounds?.bottom ?? previous.raw.top + previous.raw.height) +
+        verticalNeighborBuffer
+      : 0;
+    const bottomLimit = next
+      ? (nextInkBounds?.top ?? next.raw.top) - verticalNeighborBuffer
+      : imageHeight;
+    const leftLimit = leftNeighbor
+      ? leftSeparatorLimit ??
+        (leftNeighborInkBounds?.right ??
+          leftNeighbor.raw.left + leftNeighbor.raw.width) +
+          horizontalNeighborBuffer
+      : 0;
+    const rightLimit = rightNeighbor
+      ? rightSeparatorLimit ??
+        Math.min(rightNeighborInkBounds?.left ?? rightNeighbor.raw.left, rightNeighbor.raw.left) -
+          horizontalNeighborBuffer
+      : imageWidth;
+    applyBoundary(
+      'top',
+      Math.min(crop.top, Math.max(topLimit, inkBounds.top - verticalGuard)),
+      'ink-bounds-guard',
+    );
+    applyBoundary(
+      'bottom',
+      Math.max(
+        crop.top + crop.height,
+        Math.min(bottomLimit, bottomInkBounds.bottom + verticalGuard),
+      ),
+      'ink-bounds-guard',
+    );
+    applyBoundary(
+      'left',
+      Math.min(
+        crop.left,
+        Math.max(
+          leftLimit,
+          leftNeighbor ? crop.left - 70 : leftInkBounds.left - horizontalGuard,
+          leftInkBounds.left - horizontalGuard,
+        ),
+      ),
+      'ink-bounds-guard',
+    );
+    applyBoundary(
+      'right',
+      Math.max(
+        crop.left + crop.width,
+        Math.min(
+          rightLimit,
+          rightNeighbor ? crop.left + crop.width + 70 : inkBounds.right + horizontalGuard,
+          inkBounds.right + horizontalGuard,
+        ),
+      ),
+      'ink-bounds-guard',
+    );
+  }
+
+  return {
+    crop,
+    notes,
   };
 };
 
@@ -735,7 +1486,13 @@ const normalizeLayout = layout => {
   };
 };
 
-const cropBlocks = async ({ blocks, cropsDir, pageFile, paddingRatio }) => {
+const cropBlocks = async ({
+  blocks,
+  contextBlocks = blocks,
+  cropsDir,
+  pageFile,
+  paddingRatio,
+}) => {
   const metadata = await sharp(pageFile).metadata();
   const imageWidth = metadata.width;
   const imageHeight = metadata.height;
@@ -746,15 +1503,44 @@ const cropBlocks = async ({ blocks, cropsDir, pageFile, paddingRatio }) => {
   await fs.rm(cropsDir, { force: true, recursive: true });
   await fs.mkdir(cropsDir, { recursive: true });
   const baseName = sanitizeName(path.basename(pageFile, path.extname(pageFile)));
+  const analyzer = await createWhitespaceAnalyzer(pageFile);
+  const columnSeparator = findColumnSeparator(analyzer);
+  const rawBlocks = contextBlocks.map(block => ({
+    block,
+    raw: bboxToRawPixels({
+      bbox: block.bbox,
+      imageHeight,
+      imageWidth,
+    }),
+  }));
 
   const croppedBlocks = [];
   for (const [index, block] of blocks.entries()) {
-    const crop = bboxToPixels({
+    const initialCrop = bboxToPixels({
       bbox: block.bbox,
       imageHeight,
       imageWidth,
       paddingRatio,
     });
+    const blockInfo = rawBlocks[index];
+    const matchingBlockInfo =
+      rawBlocks.find(info => info.block === block) ||
+      rawBlocks.find(
+        info =>
+          info.block.blockId === block.blockId &&
+          info.block.label === block.label,
+      ) ||
+      blockInfo;
+    const refined = refineCropToWhitespace({
+      analyzer,
+      blockInfo: matchingBlockInfo,
+      columnSeparator,
+      imageHeight,
+      imageWidth,
+      initialCrop,
+      rawBlocks,
+    });
+    const crop = refined.crop;
     const cropName = `${baseName}-${String(index + 1).padStart(2, '0')}-${sanitizeName(block.label || block.blockId)}.jpg`;
     const cropPath = path.join(cropsDir, cropName);
 
@@ -767,7 +1553,17 @@ const cropBlocks = async ({ blocks, cropsDir, pageFile, paddingRatio }) => {
       ...block,
       cropPath,
       cropRelativePath: relativeToRepo(cropPath),
+      originalBBox: block.bbox,
       pixelBBox: crop,
+      pixelOriginalBBox: matchingBlockInfo.raw,
+      refinedBBox: cropToNormalizedBbox({
+        crop,
+        imageHeight,
+        imageWidth,
+      }),
+      whitespaceRefinement: {
+        notes: refined.notes,
+      },
     });
   }
 
@@ -996,6 +1792,7 @@ const runPagePipeline = async ({ apiKey, file, options, pageIndex, total }) => {
   );
   const cropResult = await cropBlocks({
     blocks: selectedBlocks,
+    contextBlocks: layout.blocks,
     cropsDir,
     pageFile: file,
     paddingRatio: options.paddingRatio,
@@ -1184,7 +1981,7 @@ const writeMarkdownSummary = async (jsonOutputPath, payload) => {
 const renderOverlayBoxes = page =>
   page.blocks
     .map((block, index) => {
-      const { bbox } = block;
+      const bbox = block.refinedBBox || block.bbox;
       return `<div class="overlayBox ${verdictClass(block.validation?.verdict)}"
         style="left:${bbox.x / 10}%;top:${bbox.y / 10}%;width:${bbox.width / 10}%;height:${bbox.height / 10}%;">
         <span>${index + 1}. ${htmlEscape(block.label)}</span>
@@ -1273,8 +2070,14 @@ const renderBlockCards = (page, reportDir) =>
           <div>
             <img class="cropImage" alt="${attrEscape(blockTitle(block))}" src="${cropSrc}">
             <dl class="bbox">
-              <div><dt>bbox</dt><dd>${block.bbox.x}, ${block.bbox.y}, ${block.bbox.width}, ${block.bbox.height}</dd></div>
+              <div><dt>original</dt><dd>${block.originalBBox?.x ?? block.bbox.x}, ${block.originalBBox?.y ?? block.bbox.y}, ${block.originalBBox?.width ?? block.bbox.width}, ${block.originalBBox?.height ?? block.bbox.height}</dd></div>
+              <div><dt>refined</dt><dd>${block.refinedBBox?.x ?? block.bbox.x}, ${block.refinedBBox?.y ?? block.bbox.y}, ${block.refinedBBox?.width ?? block.bbox.width}, ${block.refinedBBox?.height ?? block.bbox.height}</dd></div>
               <div><dt>crop</dt><dd>${block.pixelBBox?.left}, ${block.pixelBBox?.top}, ${block.pixelBBox?.width}, ${block.pixelBBox?.height}</dd></div>
+              ${
+                block.whitespaceRefinement?.notes?.length
+                  ? `<div><dt>snap</dt><dd>${htmlEscape(block.whitespaceRefinement.notes.join(' / '))}</dd></div>`
+                  : ''
+              }
             </dl>
           </div>
           <div class="comparePane">
