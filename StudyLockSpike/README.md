@@ -57,7 +57,7 @@ APIの応答は問題画面に反映されます。外部APIの生成には時�
 
 ### Gemini 2.5 Flashで手描き素材をOCR検証
 
-リポジトリ直下の `手描き素材/` に入れたJPEG/PNG/WEBP/HEIC/HEIFを、Gemini 2.5 Flashへ順番に送り、OCR結果を `tmp/ocr-handwriting/` にJSON、Markdown、HTMLで保存できます。HTMLは元画像とOCR結果を横並びで比較できます。APIキーはブラウザへ渡さず、Nodeスクリプト側だけで使います。
+リポジトリ直下の `手描き素材/` に入れたJPEG/PNG/WEBP/HEIC/HEIFを、Gemini 2.5 Flashへ順番に送り、OCR結果を `tmp/ocr-handwriting/` にJSON、Markdown、HTMLで保存できます。HTMLは元画像、問題ごとの切り出し画像、raw OCR、補正候補、TeX整形を横並びで比較できます。APIキーはブラウザへ渡さず、Nodeスクリプト側だけで使います。
 
 ```sh
 GEMINI_API_KEY=your_local_gemini_key
@@ -76,7 +76,13 @@ npm run ocr:handwriting -- --dry-run --limit 5
 npm run ocr:handwriting -- --limit 5
 ```
 
-全件を流す場合は `--limit` を外します。出力先を固定したい場合は `--output tmp/ocr-handwriting/latest.json` を付けてください。
+まず少数の問題ブロックだけ比較する場合:
+
+```sh
+npm run ocr:handwriting -- --limit 1 --max-blocks 2 --output tmp/ocr-handwriting/segmented-sample.json
+```
+
+処理は `粗OCR/レイアウト解析 → 問題範囲のクロップ → クロップ別OCR → 補正候補/論理検査` の3段階です。全件を流す場合は `--limit` と `--max-blocks` を外します。出力先を固定したい場合は `--output tmp/ocr-handwriting/latest.json` を付けてください。
 
 # Getting Started
 

@@ -2,6 +2,9 @@
 
 ## 2026-06-13
 
+- Gemini OCR検証を3段階パイプラインへ拡張。ページ全体の粗OCR/レイアウト解析で問題ごとの範囲を検出し、`sharp` で余白つきクロップを生成、クロップ別OCR後にrawを保持したまま補正候補・記号ジャンプ・手書きミス候補をフラグ化する構成にした。比較HTMLでは元画像、検出枠、切り出し画像、raw OCR、補正候補、TeX整形、行ごとの候補を見比べられるようにした。
+- `10log` が `10/log`、`Z_0` が `20` に読まれるような頻出の文脈OCR揺れを、rawは残したまま `ocr_suspect` として補正候補に出す軽量ヒューリスティックを追加。
+- 3段階OCR用に `sharp` をdevDependencyへ追加し、README/CCSDD設計メモに `--max-blocks` を使った少数ブロック検証手順とパイプライン概要を追記。
 - OCR検証用の手描き素材JPEG 43枚を `手描き素材/` に追加し、Gemini 2.5 Flashで実素材を比較確認できる入力データとして管理対象にした。
 - 手描き素材をGemini 2.5 FlashでOCR検証するため、`StudyLockSpike/scripts/gemini-handwriting-ocr.mjs` と `npm run ocr:handwriting` を追加。`GEMINI_API_KEY`/`GOOGLE_API_KEY` を使い、`手描き素材/` の画像を順番にOCRしてJSON/Markdownへ保存する構成にした。
 - READMEとCCSDD設計メモにGemini 2.5 Flash OCR検証手順、APIキーの置き場所、`--dry-run`/`--limit`/`--output` の使い方を追記。ルート `.env` がGitに入らないよう `.gitignore` も更新。
