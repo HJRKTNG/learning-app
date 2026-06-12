@@ -55,6 +55,29 @@ APIの応答は問題画面に反映されます。外部APIの生成には時�
 - 現在の採点は `GradingService` のローカルAIシミュレーターです。OCR/AI採点APIが決まったら、UIを触らずにサービス内部を差し替えます。
 - 手描き数学OCRの検討メモは [docs/CCSDD-LearningWorkflow.md](docs/CCSDD-LearningWorkflow.md) にまとめています。
 
+### Gemini 2.5 Flashで手描き素材をOCR検証
+
+リポジトリ直下の `手描き素材/` に入れたJPEG/PNG/WEBP/HEIC/HEIFを、Gemini 2.5 Flashへ順番に送り、OCR結果を `tmp/ocr-handwriting/` にJSON、Markdown、HTMLで保存できます。HTMLは元画像とOCR結果を横並びで比較できます。APIキーはブラウザへ渡さず、Nodeスクリプト側だけで使います。
+
+```sh
+GEMINI_API_KEY=your_local_gemini_key
+GEMINI_OCR_MODEL=gemini-2.5-flash
+```
+
+対象画像の確認だけ行う場合:
+
+```sh
+npm run ocr:handwriting -- --dry-run --limit 5
+```
+
+実際にOCRする場合:
+
+```sh
+npm run ocr:handwriting -- --limit 5
+```
+
+全件を流す場合は `--limit` を外します。出力先を固定したい場合は `--output tmp/ocr-handwriting/latest.json` を付けてください。
+
 # Getting Started
 
 > **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.

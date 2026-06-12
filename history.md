@@ -1,5 +1,13 @@
 # history.md
 
+## 2026-06-13
+
+- OCR検証用の手描き素材JPEG 43枚を `手描き素材/` に追加し、Gemini 2.5 Flashで実素材を比較確認できる入力データとして管理対象にした。
+- 手描き素材をGemini 2.5 FlashでOCR検証するため、`StudyLockSpike/scripts/gemini-handwriting-ocr.mjs` と `npm run ocr:handwriting` を追加。`GEMINI_API_KEY`/`GOOGLE_API_KEY` を使い、`手描き素材/` の画像を順番にOCRしてJSON/Markdownへ保存する構成にした。
+- READMEとCCSDD設計メモにGemini 2.5 Flash OCR検証手順、APIキーの置き場所、`--dry-run`/`--limit`/`--output` の使い方を追記。ルート `.env` がGitに入らないよう `.gitignore` も更新。
+- OCR結果を目視比較しやすいよう、検証スクリプトに元画像と認識テキストを横並び表示するHTMLレポート出力を追加。
+- Gemini REST APIの構造化出力指定を `responseMimeType` / `responseSchema` に修正し、`gemini-2.5-flash` でのOCR実行に通る形式へ調整。
+
 ## 2026-06-12
 
 - GitHubリモート `https://github.com/HJRKTNG/learning-app` を `origin` として登録し、`main` ブランチをpushして共同開発できるようにした。

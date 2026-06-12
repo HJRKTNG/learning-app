@@ -6,6 +6,7 @@
     "android": "react-native run-android",
     "ios": "react-native run-ios",
     "lint": "eslint .",
+    "ocr:handwriting": "node scripts/gemini-handwriting-ocr.mjs",
     "start": "react-native start",
     "test": "jest",
     "web": "vite --host 0.0.0.0",
