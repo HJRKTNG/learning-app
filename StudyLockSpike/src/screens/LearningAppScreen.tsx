@@ -1,8 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -11,6 +9,19 @@ import {
 } from 'react-native';
 import { CameraCapture } from '../components/CameraCapture';
 import { MathContent } from '../components/MathContent';
+import {
+  AppButton,
+  Badge,
+  Card,
+  Dots,
+  GroupedRows,
+  NavBar,
+  ProgressRing,
+  SectionLabel,
+  StatusBarMock,
+  TabBar,
+} from '../components/ui';
+import { fonts, palette, radius, spacing, type } from '../theme/theme';
 import {
   GeneratedProblem,
   GenerateProblemConfig,
@@ -22,9 +33,20 @@ import {
   GradingResult,
   gradeCapturedAnswer,
 } from '../services/gradingService';
+import { poolSnapshot, takeNextProblem } from '../services/problemPool';
+import {
+  clearProfile,
+  loadProfile,
+  UserProfile,
+} from '../services/userProfile';
+import { GuardianDashboardScreen } from './GuardianDashboardScreen';
+import { LearnerSetupScreen, RoleSelectScreen } from './OnboardingScreens';
 import { screenTitles } from './learningScreenOptions';
 
 export type LearningScreenId =
+  | 'roleSelect'
+  | 'learnerSetup'
+  | 'guardian'
   | 'home'
   | 'lock'
   | 'mission'
@@ -83,8 +105,22 @@ const fallbackProblem: GeneratedProblem = {
   title: '確率漸化式・導入問題',
 };
 
+type ProblemOrigin = 'stock' | 'api' | 'demo';
+
 const clamp = (value: number, min: number, max: number) =>
   Math.min(Math.max(value, min), max);
+
+const initialScreenForProfile = (
+  profile: UserProfile | null,
+): LearningScreenId => {
+  if (!profile) {
+    return 'roleSelect';
+  }
+  if (profile.roles.includes('guardian') && !profile.roles.includes('learner')) {
+    return 'guardian';
+  }
+  return 'home';
+};
 
 export function LearningAppScreen({
   apiConfig,
@@ -93,8 +129,17 @@ export function LearningAppScreen({
   onNavigate,
   preview = defaultPreview,
 }: LearningAppScreenProps) {
+  const [profile, setProfile] = useState<UserProfile | null>(loadProfile);
+  // onNavigate付き（Webダッシュボード）は画面を外部制御、ネイティブ単体では内部state。
+  const [internalScreen, setInternalScreen] = useState<LearningScreenId>(() =>
+    initialScreenForProfile(loadProfile()),
+  );
+  const screen = onNavigate ? preview.screen : internalScreen;
+
   const [generatedProblem, setGeneratedProblem] =
     useState<GeneratedProblem>(fallbackProblem);
+  const [problemOrigin, setProblemOrigin] = useState<ProblemOrigin>('demo');
+  const [stockReady, setStockReady] = useState(() => poolSnapshot().ready);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isGrading, setIsGrading] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
@@ -114,8 +159,31 @@ export function LearningAppScreen({
     [preview.mastered, preview.required, preview.total],
   );
 
-  const navigate = (screen: LearningScreenId) => {
-    onNavigate?.(screen);
+  const navigate = (next: LearningScreenId) => {
+    if (onNavigate) {
+      onNavigate(next);
+    } else {
+      setInternalScreen(next);
+    }
+  };
+
+  const resetAnswerState = () => {
+    setCapturedAnswer(null);
+    setGradingResult(null);
+    setManualAnswer('');
+  };
+
+  // ストック優先で次の問題を取り出す。空ならいまの問題（デモ含む）を続用する。
+  const startProblem = () => {
+    const stocked = takeNextProblem();
+    if (stocked) {
+      setGeneratedProblem(stocked.problem);
+      setProblemOrigin('stock');
+      resetAnswerState();
+      onGeneratedProblem?.(stocked.problem);
+    }
+    setStockReady(poolSnapshot().ready);
+    navigate('problem');
   };
 
   const runGenerate = async () => {
@@ -129,9 +197,8 @@ export function LearningAppScreen({
     try {
       const nextProblem = await generateStudyProblem(apiConfig, generateRequest);
       setGeneratedProblem(nextProblem);
-      setCapturedAnswer(null);
-      setGradingResult(null);
-      setManualAnswer('');
+      setProblemOrigin('api');
+      resetAnswerState();
       onGeneratedProblem?.(nextProblem);
       navigate('problem');
     } catch (caught) {
@@ -155,17 +222,52 @@ export function LearningAppScreen({
     }
   };
 
+  const resetRole = () => {
+    clearProfile();
+    setProfile(null);
+    navigate('roleSelect');
+  };
+
   const content = () => {
-    switch (preview.screen) {
+    switch (screen) {
+      case 'roleSelect':
+        return (
+          <RoleSelectScreen
+            onSelectGuardian={nextProfile => {
+              setProfile(nextProfile);
+              navigate('guardian');
+            }}
+            onSelectLearner={() => navigate('learnerSetup')}
+          />
+        );
+      case 'learnerSetup':
+        return (
+          <LearnerSetupScreen
+            onBack={() => navigate('roleSelect')}
+            onComplete={nextProfile => {
+              setProfile(nextProfile);
+              navigate('home');
+            }}
+          />
+        );
+      case 'guardian':
+        return (
+          <GuardianDashboardScreen
+            apiConfig={apiConfig}
+            generateRequest={generateRequest}
+            onResetRole={resetRole}
+          />
+        );
       case 'lock':
         return <LockScreen onStart={() => navigate('mission')} />;
       case 'mission':
         return (
           <MissionScreen
             mastered={preview.mastered}
-            onStart={() => navigate('problem')}
+            onStart={startProblem}
             progress={progress}
             required={preview.required}
+            stockReady={stockReady}
             total={preview.total}
           />
         );
@@ -176,6 +278,9 @@ export function LearningAppScreen({
             isGenerating={isGenerating}
             onCapture={() => navigate('camera')}
             onGenerate={runGenerate}
+            onNextStock={startProblem}
+            origin={problemOrigin}
+            stockReady={stockReady}
           />
         );
       case 'camera':
@@ -224,15 +329,18 @@ export function LearningAppScreen({
         );
       case 'retry':
         return (
-          <RetryScreen
-            remaining={progress.remaining}
-            onStart={() => navigate('problem')}
-          />
+          <RetryScreen remaining={progress.remaining} onStart={startProblem} />
         );
       case 'unlock':
         return <UnlockScreen onHome={() => navigate('home')} />;
       case 'settings':
-        return <SettingsScreen />;
+        return (
+          <SettingsScreen
+            onResetRole={resetRole}
+            profile={profile}
+            stockReady={stockReady}
+          />
+        );
       case 'home':
       default:
         return (
@@ -241,62 +349,51 @@ export function LearningAppScreen({
             isGenerating={isGenerating}
             onGenerate={runGenerate}
             onLock={() => navigate('lock')}
+            onStart={startProblem}
             showApiPanel={preview.showApiPanel}
+            stockReady={stockReady}
           />
         );
     }
   };
 
+  const isOnboarding = screen === 'roleSelect' || screen === 'learnerSetup';
+  const isNight = screen === 'lock';
+  const showNav =
+    !isOnboarding &&
+    !isNight &&
+    screen !== 'home' &&
+    screen !== 'unlock' &&
+    screen !== 'guardian';
+  const showTabBar =
+    !isOnboarding &&
+    !isNight &&
+    screen !== 'camera' &&
+    screen !== 'guardian';
+
   return (
     <View style={styles.app}>
-      <StatusBarLabel locked={preview.locked || preview.screen === 'lock'} />
-      {preview.screen !== 'home' &&
-      preview.screen !== 'lock' &&
-      preview.screen !== 'unlock' ? (
-        <Nav title={screenTitles[preview.screen]} onBack={() => navigate('home')} />
+      <StatusBarMock night={preview.locked || isNight} />
+      {showNav ? (
+        <NavBar onBack={() => navigate('home')} title={screenTitles[screen]} />
       ) : null}
       {content()}
-      {preview.screen !== 'lock' && preview.screen !== 'camera' ? (
-        <TabBar active={preview.screen === 'settings' ? 'settings' : 'home'} onSettings={() => navigate('settings')} />
+      {showTabBar ? (
+        <TabBar
+          active={screen === 'settings' ? 'settings' : 'home'}
+          onSelect={tab => {
+            if (tab === 'settings') {
+              navigate('settings');
+            } else if (tab === 'study') {
+              navigate('mission');
+            } else if (tab === 'review') {
+              navigate('retry');
+            } else {
+              navigate('home');
+            }
+          }}
+        />
       ) : null}
-      {preview.screen === 'home' && preview.showApiPanel ? (
-        <View style={styles.inlineApi}>
-          <Text style={styles.inlineApiTitle}>問題生成API</Text>
-          {isGenerating ? (
-            <Text style={styles.smallText}>生成中です。APIの応答に時間がかかる場合があります。</Text>
-          ) : (
-            <Text style={styles.smallText}>
-              ダッシュボードの設定で生成した問題が、問題画面に反映されます。
-            </Text>
-          )}
-          {apiError ? <Text style={styles.errorText}>{apiError}</Text> : null}
-        </View>
-      ) : null}
-    </View>
-  );
-}
-
-function StatusBarLabel({ locked }: { locked: boolean }) {
-  return (
-    <View style={[styles.statusBar, locked && styles.statusBarLocked]}>
-      <Text style={[styles.statusText, locked && styles.statusTextLocked]}>
-        {locked ? '16:00' : '13:58'}
-      </Text>
-      <Text style={[styles.statusText, locked && styles.statusTextLocked]}>
-        5G 86%
-      </Text>
-    </View>
-  );
-}
-
-function Nav({ onBack, title }: { onBack: () => void; title: string }) {
-  return (
-    <View style={styles.nav}>
-      <Pressable onPress={onBack} style={styles.navSide}>
-        <Text style={styles.linkText}>戻る</Text>
-      </Pressable>
-      <Text style={styles.navTitle}>{title}</Text>
-      <View style={styles.navSide} />
     </View>
   );
 }
@@ -306,42 +403,65 @@ function HomeScreen({
   isGenerating,
   onGenerate,
   onLock,
+  onStart,
   showApiPanel,
+  stockReady,
 }: {
   apiError: string | null;
   isGenerating: boolean;
   onGenerate: () => void;
   onLock: () => void;
+  onStart: () => void;
   showApiPanel: boolean;
+  stockReady: number;
 }) {
   return (
     <ScrollView contentContainerStyle={styles.body}>
-      <Text style={styles.largeTitle}>ホーム</Text>
-      <View style={styles.heroCard}>
-        <Text style={styles.kicker}>次のロックまで</Text>
+      <Text style={type.largeTitle}>ホーム</Text>
+      <Card>
+        <Text style={type.caption}>次のロックまで</Text>
         <Text style={styles.bigTime}>02:01:40</Text>
-        <Text style={styles.bodyText}>16:00 から今日の数学ミッションが始まります。</Text>
-      </View>
-      <Text style={styles.groupLabel}>今日の予定</Text>
+        <Text style={type.footnote}>
+          16:00 から今日の数学ミッションが始まります。
+        </Text>
+      </Card>
+      <SectionLabel>今日の予定</SectionLabel>
       <GroupedRows
         rows={[
-          ['範囲', '確率漸化式'],
-          ['問題数', '10問'],
-          ['解除ライン', '8問マスター'],
+          { label: '範囲', value: '確率漸化式' },
+          { label: '問題数', value: '10問' },
+          { label: '解除ライン', value: '8問マスター' },
         ]}
       />
-      <PrimaryButton label="ロック開始をプレビュー" onPress={onLock} variant="outline" />
-      {showApiPanel ? (
-        <View style={styles.strip}>
-          <Text style={styles.stripTitle}>GEN STUDY API</Text>
-          <Text style={styles.bodyText}>東京大学レベルの確率漸化式を生成して、問題画面へ差し込みます。</Text>
-          {apiError ? <Text style={styles.errorText}>{apiError}</Text> : null}
-          <PrimaryButton
-            label={isGenerating ? '生成中...' : 'APIで問題を生成'}
-            onPress={onGenerate}
-            variant="primary"
+      <Card>
+        <View style={styles.cardHeader}>
+          <Text style={type.headline}>問題ストック</Text>
+          <Badge
+            label={stockReady > 0 ? `残り ${stockReady} 問` : 'ストックなし'}
+            tone={stockReady > 0 ? 'success' : 'warn'}
           />
         </View>
+        <Text style={type.footnote}>
+          {stockReady > 0
+            ? '事前生成された問題からすぐに出題できます。'
+            : '保護者ダッシュボードまたはAPIで事前生成してください。'}
+        </Text>
+        <AppButton label="今すぐ1問解く" onPress={onStart} variant="secondary" />
+      </Card>
+      <AppButton label="ロック開始をプレビュー" onPress={onLock} variant="ghost" />
+      {showApiPanel ? (
+        <Card tone="accent">
+          <Text style={type.caption}>GEN STUDY API</Text>
+          <Text style={type.footnote}>
+            東京大学レベルの確率漸化式をその場で生成します（数分かかる場合があります）。
+          </Text>
+          {apiError ? <Text style={styles.errorText}>{apiError}</Text> : null}
+          <AppButton
+            disabled={isGenerating}
+            label={isGenerating ? '生成中…' : 'APIで問題を生成'}
+            onPress={onGenerate}
+          />
+        </Card>
       ) : null}
     </ScrollView>
   );
@@ -351,19 +471,22 @@ function LockScreen({ onStart }: { onStart: () => void }) {
   return (
     <View style={styles.lockScreen}>
       <View style={styles.lockGlyph}>
-        <Text style={styles.lockGlyphText}>LOCK</Text>
+        <View style={styles.lockShackle} />
+        <View style={styles.lockBody} />
       </View>
       <Text style={styles.lockTitle}>学習タイムです</Text>
       <Text style={styles.lockCopy}>
-        対象アプリを一時的にロックしました。今日の数学を解くと解除されます。
+        対象アプリを一時的にロックしました。{'\n'}今日の数学を解くと解除されます。
       </Text>
-      <View style={styles.lockMission}>
+      <Card tone="night">
         <Text style={styles.lockMissionTitle}>今日の数学ミッション</Text>
         <Text style={styles.lockMissionText}>全10問 / 8問マスターで解除</Text>
-      </View>
+      </Card>
       <View style={styles.flexSpacer} />
-      <PrimaryButton label="ミッションを始める" onPress={onStart} variant="light" />
-      <Text style={styles.lockMuted}>あとで（5分後に再通知）</Text>
+      <View style={styles.lockFooter}>
+        <AppButton label="ミッションを始める" onPress={onStart} variant="night" />
+        <Text style={styles.lockMuted}>あとで（5分後に再通知）</Text>
+      </View>
     </View>
   );
 }
@@ -373,27 +496,37 @@ function MissionScreen({
   onStart,
   progress,
   required,
+  stockReady,
   total,
 }: {
   mastered: number;
   onStart: () => void;
   progress: { current: number; remaining: number };
   required: number;
+  stockReady: number;
   total: number;
 }) {
   return (
     <View style={styles.body}>
-      <View style={styles.statusStrip}>
-        <Text style={styles.stripTitle}>ロック中</Text>
-        <Text style={styles.bodyText}>対象アプリは停止しています</Text>
-      </View>
+      <Card tone="accent">
+        <Text style={type.caption}>ロック中</Text>
+        <Text style={type.footnote}>対象アプリは停止しています</Text>
+      </Card>
       <ProgressRing label={`${progress.current}/${total}`} subLabel={`必要 ${required}`} />
       <Dots total={total} active={mastered} current={mastered + 1} />
       <Text style={styles.centerText}>
         解除まであと <Text style={styles.accentText}>{progress.remaining}問</Text> をマスター
       </Text>
+      <Text style={styles.centerFootnote}>
+        {stockReady > 0
+          ? `ストックから出題（残り ${stockReady} 問）`
+          : 'ストックがないため、現在の問題を続けます'}
+      </Text>
       <View style={styles.flexSpacer} />
-      <PrimaryButton label={`問題${Math.min(mastered + 1, total)} を解く`} onPress={onStart} />
+      <AppButton
+        label={`問題${Math.min(mastered + 1, total)} を解く`}
+        onPress={onStart}
+      />
     </View>
   );
 }
@@ -403,38 +536,58 @@ function ProblemScreen({
   isGenerating,
   onCapture,
   onGenerate,
+  onNextStock,
+  origin,
+  stockReady,
 }: {
   generatedProblem: GeneratedProblem;
   isGenerating: boolean;
   onCapture: () => void;
   onGenerate: () => void;
+  onNextStock: () => void;
+  origin: ProblemOrigin;
+  stockReady: number;
 }) {
+  const originBadge =
+    origin === 'stock'
+      ? { label: 'ストック問題', tone: 'success' as const }
+      : origin === 'api'
+        ? { label: 'API生成', tone: 'accent' as const }
+        : { label: 'デモ問題', tone: 'neutral' as const };
+
   return (
     <View style={styles.body}>
       <Dots total={10} active={3} current={4} />
       <View style={styles.problemCard}>
-        <View style={styles.problemHeader}>
-          <Text style={styles.kicker}>{generatedProblem.title}</Text>
-          <Text style={styles.sourceBadge}>
-            {generatedProblem.source === 'api' ? 'API生成' : 'デモ問題'}
-          </Text>
+        <View style={styles.cardHeader}>
+          <Text style={type.caption}>{generatedProblem.title}</Text>
+          <Badge label={originBadge.label} tone={originBadge.tone} />
         </View>
         <MathContent tone="problem" value={generatedProblem.problem} />
         {generatedProblem.latex ? (
           <View style={styles.latexBox}>
-            <Text style={styles.kicker}>LaTeX / MMD</Text>
+            <Text style={type.caption}>LaTeX / MMD</Text>
             <MathContent tone="compact" value={`$$${generatedProblem.latex}$$`} />
           </View>
         ) : null}
-        <Text style={styles.smallText}>途中式もノートに書いて撮影してください。</Text>
+        <Text style={type.footnote}>途中式もノートに書いて撮影してください。</Text>
       </View>
       <View style={styles.flexSpacer} />
-      <PrimaryButton label="解答を撮影する" onPress={onCapture} />
-      <PrimaryButton
-        label={isGenerating ? '生成中...' : 'APIで別問題を生成'}
-        onPress={onGenerate}
-        variant="outline"
-      />
+      <AppButton label="解答を撮影する" onPress={onCapture} />
+      {stockReady > 0 ? (
+        <AppButton
+          label={`ストックから次の問題（残り ${stockReady}）`}
+          onPress={onNextStock}
+          variant="secondary"
+        />
+      ) : (
+        <AppButton
+          disabled={isGenerating}
+          label={isGenerating ? '生成中…' : 'APIで別問題を生成'}
+          onPress={onGenerate}
+          variant="secondary"
+        />
+      )}
     </View>
   );
 }
@@ -451,12 +604,14 @@ function CameraScreen({
   return (
     <View style={styles.cameraScreen}>
       <View style={styles.cameraTop}>
-        <Text style={styles.cameraHint}>紙の答案を撮影、または画像を選択してください。</Text>
+        <Text style={styles.cameraHint}>
+          紙の答案を撮影、または画像を選択してください。
+        </Text>
         <TextInput
           multiline
           onChangeText={onChangeManualAnswer}
           placeholder="OCRが不完全な場合に備えて、答えや途中式を入力"
-          placeholderTextColor="#9aa1ad"
+          placeholderTextColor={palette.inkFaint}
           style={styles.answerInput}
           value={manualAnswer}
         />
@@ -477,29 +632,26 @@ function GradingScreen({
 }) {
   return (
     <View style={styles.body}>
-      {capturedAnswer?.imageDataUrl ? (
-        <View style={styles.scanBox}>
-          <Text style={styles.scanImageLabel}>{capturedAnswer.imageName}</Text>
-          <View style={styles.scanLine} />
-        </View>
-      ) : (
-        <View style={styles.scanBox}>
-          <Text style={styles.scanImageLabel}>手動入力で採点</Text>
-          <View style={styles.scanLine} />
-        </View>
-      )}
-      {isGrading ? <ActivityIndicator color="#4f46e5" /> : null}
+      <View style={styles.scanBox}>
+        <Text style={styles.scanImageLabel}>
+          {capturedAnswer?.imageDataUrl
+            ? capturedAnswer.imageName
+            : '手動入力で採点'}
+        </Text>
+        <View style={styles.scanLine} />
+      </View>
+      {isGrading ? <ActivityIndicator color={palette.accent} /> : null}
       <Text style={styles.centerTitle}>
-        {isGrading ? 'AI採点しています...' : '採点結果を準備しました'}
+        {isGrading ? 'AI採点しています…' : '採点結果を準備しました'}
       </Text>
-      <Text style={styles.centerText}>
+      <Text style={styles.centerFootnote}>
         OCR候補、手動入力、模範解答を同じ採点サービス境界へ渡しています。
       </Text>
       <GroupedRows
         rows={[
-          ['画像', capturedAnswer?.imageName ?? 'なし'],
-          ['OCR候補', capturedAnswer?.ocrText || '手動入力待ち'],
-          ['採点', gradingResult ? '完了' : '処理中'],
+          { label: '画像', value: capturedAnswer?.imageName ?? 'なし' },
+          { label: 'OCR候補', value: capturedAnswer?.ocrText || '手動入力待ち' },
+          { label: '採点', value: gradingResult ? '完了' : '処理中' },
         ]}
       />
       <View style={styles.flexSpacer} />
@@ -521,31 +673,32 @@ function CorrectScreen({
   total: number;
 }) {
   return (
-    <View style={styles.body}>
+    <ScrollView contentContainerStyle={styles.body}>
       <Text style={styles.successTitle}>正解</Text>
-      <View style={styles.problemCardSmall}>
-        <Text style={styles.kicker}>認識した答え</Text>
+      <Card>
+        <Text style={type.caption}>認識した答え</Text>
         <MathContent
           tone="body"
           value={gradingResult?.recognizedText ?? generatedProblem.answer}
         />
-      </View>
-      <View style={[styles.strip, styles.okStrip]}>
-        <Text style={styles.stripTitle}>AIフィードバック</Text>
+      </Card>
+      <Card tone="success">
+        <Text style={type.caption}>AIフィードバック</Text>
         <MathContent
           tone="body"
           value={gradingResult?.feedback ?? generatedProblem.explanation}
         />
-      </View>
-      <View style={styles.problemCardSmall}>
-        <Text style={styles.kicker}>模範解説</Text>
+      </Card>
+      <Card>
+        <Text style={type.caption}>模範解説</Text>
         <MathContent tone="body" value={generatedProblem.explanation} />
-      </View>
+      </Card>
       <Dots total={total} active={mastered + 1} />
-      <Text style={styles.centerText}>正解 {mastered + 1} / あと {Math.max(8 - mastered - 1, 0)} 問</Text>
-      <View style={styles.flexSpacer} />
-      <PrimaryButton label="次へ" onPress={onNext} />
-    </View>
+      <Text style={styles.centerText}>
+        正解 {mastered + 1} / あと {Math.max(8 - mastered - 1, 0)} 問
+      </Text>
+      <AppButton label="次へ" onPress={onNext} />
+    </ScrollView>
   );
 }
 
@@ -559,30 +712,29 @@ function WrongScreen({
   onNext: () => void;
 }) {
   return (
-    <View style={styles.body}>
+    <ScrollView contentContainerStyle={styles.body}>
       <Text style={styles.failTitle}>不正解</Text>
-      <View style={[styles.strip, styles.badStrip]}>
-        <Text style={styles.stripTitle}>認識した答え</Text>
+      <Card tone="danger">
+        <Text style={type.caption}>認識した答え</Text>
         <MathContent
           tone="body"
           value={gradingResult?.recognizedText ?? 'OCR結果なし'}
         />
-      </View>
-      <View style={[styles.strip, styles.okStrip]}>
-        <Text style={styles.stripTitle}>AIフィードバック</Text>
+      </Card>
+      <Card tone="success">
+        <Text style={type.caption}>AIフィードバック</Text>
         <MathContent
           tone="body"
           value={gradingResult?.feedback ?? generatedProblem.explanation}
         />
-      </View>
-      <View style={styles.problemCardSmall}>
-        <Text style={styles.kicker}>模範解説</Text>
+      </Card>
+      <Card>
+        <Text style={type.caption}>模範解説</Text>
         <MathContent tone="body" value={generatedProblem.explanation} />
-      </View>
-      <Text style={styles.smallText}>この問題はマスターするまで再び出題されます。</Text>
-      <View style={styles.flexSpacer} />
-      <PrimaryButton label="再挑戦へ" onPress={onNext} />
-    </View>
+      </Card>
+      <Text style={type.footnote}>この問題はマスターするまで再び出題されます。</Text>
+      <AppButton label="再挑戦へ" onPress={onNext} />
+    </ScrollView>
   );
 }
 
@@ -602,18 +754,27 @@ function MissionResultScreen({
   const passed = mastered >= required;
   return (
     <View style={styles.body}>
-      <ProgressRing label={`${mastered}/${total}`} subLabel={`目標 ${required}`} warning={!passed} />
-      <View style={[styles.strip, passed ? styles.okStrip : styles.warnStrip]}>
-        <Text style={styles.stripTitle}>{passed ? '解除できます' : `あと${required - mastered}問で解除`}</Text>
-        <Text style={styles.bodyText}>
+      <ProgressRing
+        label={`${mastered}/${total}`}
+        subLabel={`目標 ${required}`}
+        tone={passed ? 'success' : 'warn'}
+      />
+      <Card tone={passed ? 'success' : 'warn'}>
+        <Text style={type.headline}>
+          {passed ? '解除できます' : `あと${required - mastered}問で解除`}
+        </Text>
+        <Text style={type.footnote}>
           {passed
             ? '今日のミッション条件を満たしました。対象アプリを解除します。'
             : 'まだ解けていない問題をもう一度。同じ問題をマスターして累計8問で解除です。'}
         </Text>
-      </View>
+      </Card>
       <Dots total={total} active={mastered} />
       <View style={styles.flexSpacer} />
-      <PrimaryButton label={passed ? 'ロックを解除する' : '再挑戦に進む'} onPress={passed ? onUnlock : onRetry} variant="dark" />
+      <AppButton
+        label={passed ? 'ロックを解除する' : '再挑戦に進む'}
+        onPress={passed ? onUnlock : onRetry}
+      />
     </View>
   );
 }
@@ -627,20 +788,22 @@ function RetryScreen({
 }) {
   return (
     <View style={styles.body}>
-      <View style={[styles.strip, styles.warnStrip]}>
-        <Text style={styles.stripTitle}>あと{remaining}問で解除</Text>
-        <Text style={styles.bodyText}>まだ解けていない同じ問題にもう一度挑戦します。</Text>
-      </View>
-      <Text style={styles.groupLabel}>再挑戦リスト</Text>
+      <Card tone="warn">
+        <Text style={type.headline}>あと{remaining}問で解除</Text>
+        <Text style={type.footnote}>
+          まだ解けていない同じ問題にもう一度挑戦します。
+        </Text>
+      </Card>
+      <SectionLabel>再挑戦リスト</SectionLabel>
       <GroupedRows
         rows={[
-          ['問2・確率漸化式', '再挑戦'],
-          ['問4・条件付き確率', '再挑戦'],
-          ['問7・期待値', '再挑戦'],
+          { label: '問2・確率漸化式', value: '再挑戦' },
+          { label: '問4・条件付き確率', value: '再挑戦' },
+          { label: '問7・期待値', value: '再挑戦' },
         ]}
       />
       <View style={styles.flexSpacer} />
-      <PrimaryButton label="再挑戦を始める" onPress={onStart} />
+      <AppButton label="再挑戦を始める" onPress={onStart} />
     </View>
   );
 }
@@ -649,147 +812,72 @@ function UnlockScreen({ onHome }: { onHome: () => void }) {
   return (
     <View style={styles.bodyCenter}>
       <Text style={styles.successTitle}>ロック解除！</Text>
-      <Text style={styles.centerText}>今日のミッション達成。対象アプリが使えるようになりました。</Text>
-      <GroupedRows
-        rows={[
-          ['今日の正解', '8 / 10'],
-          ['連続達成', '12日'],
-          ['次のロック', '明日 16:00'],
-        ]}
-      />
+      <Text style={styles.centerText}>
+        今日のミッション達成。対象アプリが使えるようになりました。
+      </Text>
+      <View style={styles.fullWidth}>
+        <GroupedRows
+          rows={[
+            { label: '今日の正解', value: '8 / 10' },
+            { label: '連続達成', value: '12日' },
+            { label: '次のロック', value: '明日 16:00' },
+          ]}
+        />
+      </View>
       <View style={styles.flexSpacer} />
-      <PrimaryButton label="ホームに戻る" onPress={onHome} />
-    </View>
-  );
-}
-
-function SettingsScreen() {
-  return (
-    <ScrollView contentContainerStyle={styles.body}>
-      <Text style={styles.groupLabel}>ロック</Text>
-      <GroupedRows
-        rows={[
-          ['ロックスケジュール', '平日 16:00'],
-          ['対象アプリ', 'SNS / 動画 / ゲーム'],
-          ['解除条件', '10問中8問'],
-        ]}
-      />
-      <Text style={styles.groupLabel}>学習</Text>
-      <GroupedRows
-        rows={[
-          ['教科', '数学'],
-          ['レベル', 'University of Tokyo'],
-          ['出題トピック', 'Probability Recurrence Relations'],
-        ]}
-      />
-    </ScrollView>
-  );
-}
-
-function ProgressRing({
-  label,
-  subLabel,
-  warning,
-}: {
-  label: string;
-  subLabel: string;
-  warning?: boolean;
-}) {
-  return (
-    <View style={[styles.ring, warning && styles.ringWarn]}>
-      <View style={styles.ringInner}>
-        <Text style={styles.ringLabel}>{label}</Text>
-        <Text style={styles.ringSub}>{subLabel}</Text>
+      <View style={styles.fullWidth}>
+        <AppButton label="ホームに戻る" onPress={onHome} />
       </View>
     </View>
   );
 }
 
-function Dots({
-  active,
-  current,
-  total,
+function SettingsScreen({
+  onResetRole,
+  profile,
+  stockReady,
 }: {
-  active: number;
-  current?: number;
-  total: number;
+  onResetRole: () => void;
+  profile: UserProfile | null;
+  stockReady: number;
 }) {
-  return (
-    <View style={styles.dots}>
-      {Array.from({ length: total }).map((_, index) => (
-        <View
-          key={index}
-          style={[
-            styles.dot,
-            index < active && styles.dotActive,
-            current === index + 1 && styles.dotCurrent,
-          ]}
-        />
-      ))}
-    </View>
-  );
-}
+  const roleLabel = !profile
+    ? '未設定'
+    : profile.roles.includes('guardian') && profile.roles.includes('learner')
+      ? '保護者・学習者'
+      : profile.roles.includes('guardian')
+        ? '保護者'
+        : profile.learnerManagement === 'guardian-linked'
+          ? '学習者（保護者と連携）'
+          : '学習者（自分で管理）';
 
-function GroupedRows({ rows }: { rows: Array<[string, string]> }) {
   return (
-    <View style={styles.group}>
-      {rows.map(([label, value]) => (
-        <View key={label} style={styles.row}>
-          <Text style={styles.rowLabel}>{label}</Text>
-          <Text style={styles.rowValue}>{value}</Text>
-        </View>
-      ))}
-    </View>
-  );
-}
-
-function TabBar({
-  active,
-  onSettings,
-}: {
-  active: 'home' | 'settings';
-  onSettings: () => void;
-}) {
-  return (
-    <View style={styles.tabBar}>
-      <Text style={[styles.tabItem, active === 'home' && styles.tabActive]}>ホーム</Text>
-      <Text style={styles.tabItem}>学習</Text>
-      <Text style={styles.tabItem}>復習</Text>
-      <Pressable onPress={onSettings}>
-        <Text style={[styles.tabItem, active === 'settings' && styles.tabActive]}>設定</Text>
-      </Pressable>
-    </View>
-  );
-}
-
-function PrimaryButton({
-  label,
-  onPress,
-  variant = 'primary',
-}: {
-  label: string;
-  onPress: () => void;
-  variant?: 'primary' | 'outline' | 'dark' | 'light';
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.button,
-        variant === 'outline' && styles.buttonOutline,
-        variant === 'dark' && styles.buttonDark,
-        variant === 'light' && styles.buttonLight,
-        pressed && styles.buttonPressed,
-      ]}>
-      <Text
-        style={[
-          styles.buttonText,
-          variant === 'outline' && styles.buttonOutlineText,
-          variant === 'light' && styles.buttonLightText,
-        ]}>
-        {label}
-      </Text>
-    </Pressable>
+    <ScrollView contentContainerStyle={styles.body}>
+      <SectionLabel>アカウント</SectionLabel>
+      <GroupedRows
+        rows={[
+          { label: '役割', value: roleLabel },
+          { label: '役割の選択をやり直す', onPress: onResetRole },
+        ]}
+      />
+      <SectionLabel>ロック</SectionLabel>
+      <GroupedRows
+        rows={[
+          { label: 'ロックスケジュール', value: '平日 16:00' },
+          { label: '対象アプリ', value: 'SNS / 動画 / ゲーム' },
+          { label: '解除条件', value: '10問中8問' },
+        ]}
+      />
+      <SectionLabel>学習</SectionLabel>
+      <GroupedRows
+        rows={[
+          { label: '教科', value: '数学' },
+          { label: 'レベル', value: 'University of Tokyo' },
+          { label: '出題トピック', value: 'Probability Recurrence Relations' },
+          { label: '問題ストック', value: `残り ${stockReady} 問` },
+        ]}
+      />
+    </ScrollView>
   );
 }
 
@@ -814,470 +902,200 @@ export function DevTextInput({
   );
 }
 
-const mono = Platform.select({ default: 'monospace', ios: 'Menlo' });
-
 const styles = StyleSheet.create({
   accentText: {
-    color: '#3730a3',
+    color: palette.accentDeep,
     fontWeight: '800',
   },
-  app: {
-    backgroundColor: '#f1f2f5',
-    flex: 1,
-    overflow: 'hidden',
-  },
-  badStrip: {
-    backgroundColor: '#fae6e6',
-  },
   answerInput: {
-    backgroundColor: '#ffffff',
-    borderColor: '#d8dbe4',
-    borderRadius: 10,
+    backgroundColor: palette.surface,
+    borderColor: palette.line,
+    borderRadius: radius.inner,
     borderWidth: 1,
-    color: '#1b1e26',
+    color: palette.ink,
     fontSize: 14,
     minHeight: 76,
-    paddingHorizontal: 12,
+    paddingHorizontal: spacing.md,
     paddingVertical: 10,
     textAlignVertical: 'top',
   },
+  app: {
+    backgroundColor: palette.canvas,
+    flex: 1,
+    overflow: 'hidden',
+  },
   bigTime: {
-    color: '#1b1e26',
-    fontFamily: mono,
+    color: palette.ink,
+    fontFamily: fonts.mono,
     fontSize: 42,
     fontWeight: '700',
-    marginTop: 6,
+    letterSpacing: -1,
   },
   body: {
-    backgroundColor: '#ffffff',
     flexGrow: 1,
-    gap: 14,
-    padding: 18,
+    gap: spacing.md,
+    padding: spacing.lg,
   },
   bodyCenter: {
     alignItems: 'center',
-    backgroundColor: '#ffffff',
     flex: 1,
-    gap: 16,
+    gap: spacing.md,
     justifyContent: 'center',
-    padding: 22,
-  },
-  bodyText: {
-    color: '#596171',
-    fontSize: 14,
-    lineHeight: 21,
-  },
-  button: {
-    alignItems: 'center',
-    backgroundColor: '#4f46e5',
-    borderRadius: 12,
-    minHeight: 48,
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-  },
-  buttonDark: {
-    backgroundColor: '#1b1e26',
-  },
-  buttonLight: {
-    backgroundColor: '#ffffff',
-  },
-  buttonLightText: {
-    color: '#3a32c4',
-  },
-  buttonOutline: {
-    backgroundColor: '#ffffff',
-    borderColor: '#4f46e5',
-    borderWidth: 1,
-  },
-  buttonOutlineText: {
-    color: '#4f46e5',
-  },
-  buttonPressed: {
-    opacity: 0.72,
-  },
-  buttonText: {
-    color: '#ffffff',
-    fontSize: 15,
-    fontWeight: '800',
+    padding: spacing.lg,
   },
   cameraHint: {
-    color: '#c9ced8',
+    color: palette.nightText,
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '600',
     lineHeight: 18,
   },
   cameraScreen: {
-    backgroundColor: '#1b1d24',
+    backgroundColor: palette.night,
     flex: 1,
   },
   cameraTop: {
-    gap: 10,
-    padding: 14,
+    gap: spacing.sm,
+    padding: spacing.md,
+  },
+  cardHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  centerFootnote: {
+    ...type.footnote,
+    textAlign: 'center',
   },
   centerText: {
-    color: '#596171',
-    fontSize: 14,
-    lineHeight: 22,
+    ...type.body,
     textAlign: 'center',
   },
   centerTitle: {
-    color: '#1b1e26',
+    ...type.headline,
     fontSize: 18,
-    fontWeight: '800',
     textAlign: 'center',
   },
   devField: {
     gap: 6,
   },
   devInput: {
-    backgroundColor: '#ffffff',
-    borderColor: '#d8dbe4',
+    backgroundColor: palette.surface,
+    borderColor: palette.line,
     borderRadius: 8,
     borderWidth: 1,
-    color: '#1f2937',
+    color: palette.ink,
     fontSize: 13,
     minHeight: 38,
     paddingHorizontal: 10,
   },
   devLabel: {
-    color: '#6b7280',
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.4,
-    textTransform: 'uppercase',
-  },
-  dot: {
-    backgroundColor: '#dcdfe6',
-    borderRadius: 4,
-    flex: 1,
-    height: 7,
-  },
-  dotActive: {
-    backgroundColor: '#1f9d57',
-  },
-  dotCurrent: {
-    backgroundColor: '#4f46e5',
-  },
-  dots: {
-    flexDirection: 'row',
-    gap: 4,
+    ...type.caption,
   },
   errorText: {
-    color: '#a83232',
+    color: palette.danger,
     fontSize: 12,
     lineHeight: 18,
   },
   failTitle: {
-    color: '#a83232',
+    color: palette.danger,
     fontSize: 28,
-    fontWeight: '900',
+    fontWeight: '800',
+    letterSpacing: -0.5,
   },
   flexSpacer: {
     flex: 1,
   },
-  group: {
-    backgroundColor: '#ffffff',
-    borderColor: '#e2e4ea',
-    borderRadius: 12,
-    borderWidth: 1,
-    overflow: 'hidden',
-  },
-  groupLabel: {
-    color: '#9aa1ad',
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.6,
-    textTransform: 'uppercase',
-  },
-  heroCard: {
-    backgroundColor: '#ffffff',
-    borderColor: '#e2e4ea',
-    borderRadius: 14,
-    borderWidth: 1,
-    gap: 4,
-    padding: 16,
+  fullWidth: {
+    alignSelf: 'stretch',
   },
   latexBox: {
-    gap: 8,
+    gap: spacing.sm,
   },
-  inlineApi: {
-    backgroundColor: '#eceafe',
-    borderTopColor: '#d8d3ff',
-    borderTopWidth: 1,
-    gap: 4,
-    padding: 12,
-  },
-  inlineApiTitle: {
-    color: '#3730a3',
-    fontSize: 12,
-    fontWeight: '900',
-  },
-  kicker: {
-    color: '#6b7280',
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
-  },
-  largeTitle: {
-    color: '#1b1e26',
-    fontSize: 28,
-    fontWeight: '900',
-  },
-  linkText: {
-    color: '#4f46e5',
-    fontSize: 14,
-    fontWeight: '700',
+  lockBody: {
+    backgroundColor: palette.surface,
+    borderRadius: 8,
+    height: 34,
+    width: 46,
   },
   lockCopy: {
-    color: 'rgba(255,255,255,0.82)',
+    color: palette.nightText,
     fontSize: 14,
     lineHeight: 22,
     textAlign: 'center',
   },
+  lockFooter: {
+    alignSelf: 'stretch',
+    gap: spacing.md,
+  },
   lockGlyph: {
     alignItems: 'center',
-    borderColor: 'rgba(255,255,255,0.55)',
-    borderRadius: 18,
-    borderWidth: 2,
-    height: 74,
-    justifyContent: 'center',
-    width: 74,
-  },
-  lockGlyphText: {
-    color: '#ffffff',
-    fontFamily: mono,
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  lockMission: {
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    borderRadius: 12,
-    gap: 4,
-    padding: 14,
-    width: '100%',
+    marginTop: spacing.xl,
   },
   lockMissionText: {
-    color: 'rgba(255,255,255,0.82)',
+    color: palette.nightText,
     fontSize: 13,
   },
   lockMissionTitle: {
-    color: '#ffffff',
+    color: palette.surface,
     fontSize: 14,
-    fontWeight: '900',
+    fontWeight: '800',
   },
   lockMuted: {
-    color: 'rgba(255,255,255,0.58)',
+    color: palette.nightTextFaint,
     fontSize: 12,
     textAlign: 'center',
   },
   lockScreen: {
     alignItems: 'center',
-    backgroundColor: '#272178',
+    backgroundColor: palette.night,
     flex: 1,
-    gap: 16,
-    padding: 22,
-    paddingTop: 56,
+    gap: spacing.lg,
+    padding: spacing.lg,
+    paddingTop: 48,
+  },
+  lockShackle: {
+    borderColor: palette.surface,
+    borderRadius: 14,
+    borderWidth: 5,
+    height: 30,
+    marginBottom: -12,
+    width: 30,
   },
   lockTitle: {
-    color: '#ffffff',
-    fontSize: 24,
-    fontWeight: '900',
-  },
-  nav: {
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderBottomColor: '#e2e4ea',
-    borderBottomWidth: 1,
-    flexDirection: 'row',
-    minHeight: 44,
-    paddingHorizontal: 14,
-  },
-  navSide: {
-    width: 56,
-  },
-  navTitle: {
-    color: '#1b1e26',
-    flex: 1,
-    fontSize: 15,
+    color: palette.surface,
+    fontSize: 26,
     fontWeight: '800',
-    textAlign: 'center',
-  },
-  okStrip: {
-    backgroundColor: '#e3f5ea',
+    letterSpacing: -0.5,
   },
   problemCard: {
-    backgroundColor: '#ffffff',
-    borderColor: '#e2e4ea',
-    borderRadius: 14,
-    borderWidth: 1,
+    backgroundColor: palette.surface,
+    borderRadius: radius.card,
     flex: 1,
-    gap: 14,
-    padding: 16,
-  },
-  problemCardSmall: {
-    backgroundColor: '#ffffff',
-    borderColor: '#e2e4ea',
-    borderRadius: 14,
-    borderWidth: 1,
-    gap: 8,
-    padding: 16,
-  },
-  problemHeader: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 8,
-    justifyContent: 'space-between',
-  },
-  ring: {
-    alignSelf: 'center',
-    alignItems: 'center',
-    backgroundColor: '#4f46e5',
-    borderRadius: 62,
-    height: 124,
-    justifyContent: 'center',
-    width: 124,
-  },
-  ringInner: {
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderRadius: 48,
-    height: 96,
-    justifyContent: 'center',
-    width: 96,
-  },
-  ringLabel: {
-    color: '#1b1e26',
-    fontFamily: mono,
-    fontSize: 24,
-    fontWeight: '900',
-  },
-  ringSub: {
-    color: '#6b7280',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  ringWarn: {
-    backgroundColor: '#d8812a',
-  },
-  row: {
-    alignItems: 'center',
-    borderBottomColor: '#e2e4ea',
-    borderBottomWidth: 1,
-    flexDirection: 'row',
-    gap: 12,
-    minHeight: 48,
-    paddingHorizontal: 14,
-  },
-  rowLabel: {
-    color: '#1b1e26',
-    flex: 1,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  rowValue: {
-    color: '#6b7280',
-    fontFamily: mono,
-    fontSize: 12,
+    gap: spacing.md,
+    padding: spacing.lg,
   },
   scanBox: {
-    backgroundColor: '#f6f7f9',
-    borderColor: '#e2e4ea',
-    borderRadius: 12,
-    borderWidth: 1,
+    backgroundColor: palette.surface,
+    borderRadius: radius.inner,
     height: 148,
     justifyContent: 'center',
     overflow: 'hidden',
   },
   scanImageLabel: {
-    color: '#596171',
+    color: palette.inkSoft,
     fontSize: 12,
-    fontWeight: '800',
-    paddingHorizontal: 12,
-    paddingTop: 12,
+    fontWeight: '700',
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
   },
   scanLine: {
-    backgroundColor: '#4f46e5',
+    backgroundColor: palette.accent,
     height: 2,
   },
-  smallText: {
-    color: '#6b7280',
-    fontSize: 12,
-    lineHeight: 18,
-  },
-  statusBar: {
-    alignItems: 'flex-end',
-    flexDirection: 'row',
-    height: 38,
-    justifyContent: 'space-between',
-    paddingBottom: 6,
-    paddingHorizontal: 20,
-  },
-  statusBarLocked: {
-    backgroundColor: '#272178',
-  },
-  statusStrip: {
-    backgroundColor: '#eceafe',
-    borderRadius: 12,
-    gap: 4,
-    padding: 14,
-  },
-  sourceBadge: {
-    backgroundColor: '#eceafe',
-    borderRadius: 999,
-    color: '#3730a3',
-    fontSize: 11,
-    fontWeight: '900',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  statusText: {
-    color: '#1b1e26',
-    fontFamily: mono,
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  statusTextLocked: {
-    color: '#ffffff',
-  },
-  strip: {
-    backgroundColor: '#eceafe',
-    borderRadius: 12,
-    gap: 7,
-    padding: 14,
-  },
-  stripTitle: {
-    color: '#3730a3',
-    fontSize: 12,
-    fontWeight: '900',
-    letterSpacing: 0.4,
-    textTransform: 'uppercase',
-  },
   successTitle: {
-    color: '#137a40',
+    color: palette.success,
     fontSize: 28,
-    fontWeight: '900',
-  },
-  tabActive: {
-    color: '#4f46e5',
-  },
-  tabBar: {
-    backgroundColor: '#ffffff',
-    borderTopColor: '#e2e4ea',
-    borderTopWidth: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingBottom: 14,
-    paddingTop: 9,
-  },
-  tabItem: {
-    color: '#9aa1ad',
-    fontSize: 11,
     fontWeight: '800',
-    minWidth: 54,
-    textAlign: 'center',
-  },
-  warnStrip: {
-    backgroundColor: '#fbeeda',
+    letterSpacing: -0.5,
   },
 });

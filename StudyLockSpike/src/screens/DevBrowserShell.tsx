@@ -15,6 +15,8 @@ import {
   LearningScreenId,
 } from './LearningAppScreen';
 import { GeneratedProblem, GenerateProblemRequest } from '../api/genStudyApi';
+import { clearPool, poolSnapshot } from '../services/problemPool';
+import { clearProfile, loadProfile } from '../services/userProfile';
 import { learningScreenOptions } from './learningScreenOptions';
 
 const defaultApiUrl =
@@ -43,7 +45,20 @@ const initialScreenFromUrl = (): LearningScreenId => {
     'screen',
   );
   const match = learningScreenOptions.find(option => option.id === requested);
-  return match?.id ?? 'home';
+  if (match) {
+    return match.id;
+  }
+  const profile = loadProfile();
+  if (!profile) {
+    return 'roleSelect';
+  }
+  if (
+    profile.roles.includes('guardian') &&
+    !profile.roles.includes('learner')
+  ) {
+    return 'guardian';
+  }
+  return 'home';
 };
 
 export function DevBrowserShell() {
@@ -55,6 +70,14 @@ export function DevBrowserShell() {
   const [apiToken, setApiToken] = useState(defaultApiToken);
   const [request, setRequest] = useState<GenerateProblemRequest>(initialRequest);
   const [lastProblem, setLastProblem] = useState<GeneratedProblem | null>(null);
+  const [pool, setPool] = useState(poolSnapshot);
+  // プロフィールやストックをdev側でリセットしたら、プレビューを作り直して反映する
+  const [previewKey, setPreviewKey] = useState(0);
+
+  const refreshDevState = () => {
+    setPool(poolSnapshot());
+    setPreviewKey(current => current + 1);
+  };
 
   const apiConfig = useMemo(
     () => ({
@@ -146,6 +169,36 @@ export function DevBrowserShell() {
         </View>
 
         <View style={styles.section}>
+          <Text style={styles.sectionTitle}>ストック / プロフィール</Text>
+          <Text style={styles.copy}>
+            事前生成ストック: 残り {pool.ready} 問 / 使用済み {pool.used} 問。
+            生成は保護者ダッシュボード画面から実行できます。
+          </Text>
+          <View style={styles.actionRow}>
+            <Pressable onPress={refreshDevState} style={styles.actionButton}>
+              <Text style={styles.actionText}>表示を更新</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                clearPool();
+                refreshDevState();
+              }}
+              style={styles.actionButton}>
+              <Text style={styles.actionText}>ストック全消去</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                clearProfile();
+                updatePreview('screen', 'roleSelect');
+                refreshDevState();
+              }}
+              style={styles.actionButton}>
+              <Text style={styles.actionText}>役割リセット</Text>
+            </Pressable>
+          </View>
+        </View>
+
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>問題生成API</Text>
           <DevTextInput label="API URL" onChangeText={setApiUrl} value={apiUrl} />
           <View style={styles.field}>
@@ -201,6 +254,7 @@ export function DevBrowserShell() {
           <View style={styles.notch} />
           <View style={styles.phoneScreen}>
             <LearningAppScreen
+              key={previewKey}
               apiConfig={apiConfig}
               generateRequest={request}
               onGeneratedProblem={setLastProblem}
@@ -269,6 +323,24 @@ function Toggle({
 }
 
 const styles = StyleSheet.create({
+  actionButton: {
+    backgroundColor: '#ffffff',
+    borderColor: '#d8dbe4',
+    borderRadius: 8,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  actionText: {
+    color: '#1f2937',
+    fontSize: 12,
+    fontWeight: '700',
+  },
   controlLabel: {
     color: '#1f2937',
     flex: 1,
