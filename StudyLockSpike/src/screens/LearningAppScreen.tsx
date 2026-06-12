@@ -11,21 +11,22 @@ import { CameraCapture } from '../components/CameraCapture';
 import { MathContent } from '../components/MathContent';
 import {
   AppButton,
-  Badge,
-  Card,
+  Callout,
   Dots,
+  Field,
   GroupedRows,
   NavBar,
+  OptionSelect,
   ProgressRing,
   SectionLabel,
   StatusBarMock,
   TabBar,
+  Tag,
 } from '../components/ui';
 import { fonts, palette, radius, spacing, type } from '../theme/theme';
 import {
   GeneratedProblem,
   GenerateProblemConfig,
-  GenerateProblemRequest,
   generateStudyProblem,
 } from '../api/genStudyApi';
 import {
@@ -34,6 +35,14 @@ import {
   gradeCapturedAnswer,
 } from '../services/gradingService';
 import { poolSnapshot, takeNextProblem } from '../services/problemPool';
+import {
+  buildGenerateRequest,
+  difficultyOptions,
+  loadStudySettings,
+  saveStudySettings,
+  schoolOptions,
+  StudySettings,
+} from '../services/studySettings';
 import {
   clearProfile,
   loadProfile,
@@ -66,12 +75,10 @@ export type LearningPreviewState = {
   total: number;
   required: number;
   locked: boolean;
-  showApiPanel: boolean;
 };
 
 type LearningAppScreenProps = {
   apiConfig?: GenerateProblemConfig;
-  generateRequest?: GenerateProblemRequest;
   preview?: LearningPreviewState;
   onNavigate?: (screen: LearningScreenId) => void;
   onGeneratedProblem?: (problem: GeneratedProblem) => void;
@@ -82,14 +89,7 @@ const defaultPreview: LearningPreviewState = {
   mastered: 3,
   required: 8,
   screen: 'home',
-  showApiPanel: true,
   total: 10,
-};
-
-const defaultRequest: GenerateProblemRequest = {
-  level: 'University of Tokyo',
-  subject: 'math',
-  topic: 'Probability Recurrence Relations',
 };
 
 const fallbackProblem: GeneratedProblem = {
@@ -124,7 +124,6 @@ const initialScreenForProfile = (
 
 export function LearningAppScreen({
   apiConfig,
-  generateRequest = defaultRequest,
   onGeneratedProblem,
   onNavigate,
   preview = defaultPreview,
@@ -136,6 +135,7 @@ export function LearningAppScreen({
   );
   const screen = onNavigate ? preview.screen : internalScreen;
 
+  const [settings, setSettings] = useState<StudySettings>(loadStudySettings);
   const [generatedProblem, setGeneratedProblem] =
     useState<GeneratedProblem>(fallbackProblem);
   const [problemOrigin, setProblemOrigin] = useState<ProblemOrigin>('demo');
@@ -167,6 +167,10 @@ export function LearningAppScreen({
     }
   };
 
+  const updateSettings = (next: StudySettings) => {
+    setSettings(saveStudySettings(next));
+  };
+
   const resetAnswerState = () => {
     setCapturedAnswer(null);
     setGradingResult(null);
@@ -195,7 +199,10 @@ export function LearningAppScreen({
     setIsGenerating(true);
     setApiError(null);
     try {
-      const nextProblem = await generateStudyProblem(apiConfig, generateRequest);
+      const nextProblem = await generateStudyProblem(
+        apiConfig,
+        buildGenerateRequest(settings),
+      );
       setGeneratedProblem(nextProblem);
       setProblemOrigin('api');
       resetAnswerState();
@@ -254,8 +261,9 @@ export function LearningAppScreen({
         return (
           <GuardianDashboardScreen
             apiConfig={apiConfig}
-            generateRequest={generateRequest}
+            onChangeSettings={updateSettings}
             onResetRole={resetRole}
+            settings={settings}
           />
         );
       case 'lock':
@@ -274,6 +282,7 @@ export function LearningAppScreen({
       case 'problem':
         return (
           <ProblemScreen
+            apiError={apiError}
             generatedProblem={generatedProblem}
             isGenerating={isGenerating}
             onCapture={() => navigate('camera')}
@@ -336,8 +345,10 @@ export function LearningAppScreen({
       case 'settings':
         return (
           <SettingsScreen
+            onChangeSettings={updateSettings}
             onResetRole={resetRole}
             profile={profile}
+            settings={settings}
             stockReady={stockReady}
           />
         );
@@ -345,12 +356,9 @@ export function LearningAppScreen({
       default:
         return (
           <HomeScreen
-            apiError={apiError}
-            isGenerating={isGenerating}
-            onGenerate={runGenerate}
             onLock={() => navigate('lock')}
             onStart={startProblem}
-            showApiPanel={preview.showApiPanel}
+            settings={settings}
             stockReady={stockReady}
           />
         );
@@ -399,71 +407,51 @@ export function LearningAppScreen({
 }
 
 function HomeScreen({
-  apiError,
-  isGenerating,
-  onGenerate,
   onLock,
   onStart,
-  showApiPanel,
+  settings,
   stockReady,
 }: {
-  apiError: string | null;
-  isGenerating: boolean;
-  onGenerate: () => void;
   onLock: () => void;
   onStart: () => void;
-  showApiPanel: boolean;
+  settings: StudySettings;
   stockReady: number;
 }) {
+  const school = schoolOptions.find(option => option.id === settings.school);
+  const difficulty = difficultyOptions.find(
+    option => option.id === settings.difficulty,
+  );
   return (
-    <ScrollView contentContainerStyle={styles.body}>
+    <View style={styles.body}>
       <Text style={type.largeTitle}>ホーム</Text>
-      <Card>
+      <View style={styles.heroBlock}>
         <Text style={type.caption}>次のロックまで</Text>
         <Text style={styles.bigTime}>02:01:40</Text>
-        <Text style={type.footnote}>
-          16:00 から今日の数学ミッションが始まります。
-        </Text>
-      </Card>
-      <SectionLabel>今日の予定</SectionLabel>
+        <Text style={type.footnote}>16:00 から今日の数学ミッション</Text>
+      </View>
       <GroupedRows
         rows={[
-          { label: '範囲', value: '確率漸化式' },
-          { label: '問題数', value: '10問' },
-          { label: '解除ライン', value: '8問マスター' },
+          { label: '範囲', value: settings.topic },
+          {
+            label: 'レベル',
+            value: `${school?.label ?? ''}・${difficulty?.label ?? ''}`,
+          },
+          { label: '解除ライン', value: '10問中8問マスター' },
+          {
+            label: '問題ストック',
+            value: stockReady > 0 ? `残り ${stockReady} 問` : 'なし',
+          },
         ]}
       />
-      <Card>
-        <View style={styles.cardHeader}>
-          <Text style={type.headline}>問題ストック</Text>
-          <Badge
-            label={stockReady > 0 ? `残り ${stockReady} 問` : 'ストックなし'}
-            tone={stockReady > 0 ? 'success' : 'warn'}
-          />
-        </View>
-        <Text style={type.footnote}>
-          {stockReady > 0
-            ? '事前生成された問題からすぐに出題できます。'
-            : '保護者ダッシュボードまたはAPIで事前生成してください。'}
+      {stockReady === 0 ? (
+        <Text style={styles.warnText}>
+          ストックが空です。保護者ダッシュボードで事前生成してください。
         </Text>
-        <AppButton label="今すぐ1問解く" onPress={onStart} variant="secondary" />
-      </Card>
-      <AppButton label="ロック開始をプレビュー" onPress={onLock} variant="ghost" />
-      {showApiPanel ? (
-        <Card tone="accent">
-          <Text style={type.caption}>GEN STUDY API</Text>
-          <Text style={type.footnote}>
-            東京大学レベルの確率漸化式をその場で生成します（数分かかる場合があります）。
-          </Text>
-          {apiError ? <Text style={styles.errorText}>{apiError}</Text> : null}
-          <AppButton
-            disabled={isGenerating}
-            label={isGenerating ? '生成中…' : 'APIで問題を生成'}
-            onPress={onGenerate}
-          />
-        </Card>
       ) : null}
-    </ScrollView>
+      <View style={styles.flexSpacer} />
+      <AppButton label="今すぐ1問解く" onPress={onStart} />
+      <AppButton label="ロック開始をプレビュー" onPress={onLock} variant="ghost" />
+    </View>
   );
 }
 
@@ -478,10 +466,10 @@ function LockScreen({ onStart }: { onStart: () => void }) {
       <Text style={styles.lockCopy}>
         対象アプリを一時的にロックしました。{'\n'}今日の数学を解くと解除されます。
       </Text>
-      <Card tone="night">
+      <View style={styles.lockMission}>
         <Text style={styles.lockMissionTitle}>今日の数学ミッション</Text>
         <Text style={styles.lockMissionText}>全10問 / 8問マスターで解除</Text>
-      </Card>
+      </View>
       <View style={styles.flexSpacer} />
       <View style={styles.lockFooter}>
         <AppButton label="ミッションを始める" onPress={onStart} variant="night" />
@@ -508,20 +496,25 @@ function MissionScreen({
 }) {
   return (
     <View style={styles.body}>
-      <Card tone="accent">
-        <Text style={type.caption}>ロック中</Text>
+      <Callout title="ロック中" tone="warn">
         <Text style={type.footnote}>対象アプリは停止しています</Text>
-      </Card>
-      <ProgressRing label={`${progress.current}/${total}`} subLabel={`必要 ${required}`} />
-      <Dots total={total} active={mastered} current={mastered + 1} />
-      <Text style={styles.centerText}>
-        解除まであと <Text style={styles.accentText}>{progress.remaining}問</Text> をマスター
-      </Text>
-      <Text style={styles.centerFootnote}>
-        {stockReady > 0
-          ? `ストックから出題（残り ${stockReady} 問）`
-          : 'ストックがないため、現在の問題を続けます'}
-      </Text>
+      </Callout>
+      <View style={styles.missionCenter}>
+        <ProgressRing
+          label={`${progress.current}/${total}`}
+          subLabel={`必要 ${required}`}
+        />
+        <Dots total={total} active={mastered} current={mastered + 1} />
+        <Text style={styles.centerText}>
+          解除まであと <Text style={styles.accentText}>{progress.remaining}問</Text>{' '}
+          をマスター
+        </Text>
+        <Text style={styles.centerFootnote}>
+          {stockReady > 0
+            ? `ストックから出題（残り ${stockReady} 問）`
+            : 'ストックがないため、現在の問題を続けます'}
+        </Text>
+      </View>
       <View style={styles.flexSpacer} />
       <AppButton
         label={`問題${Math.min(mastered + 1, total)} を解く`}
@@ -532,6 +525,7 @@ function MissionScreen({
 }
 
 function ProblemScreen({
+  apiError,
   generatedProblem,
   isGenerating,
   onCapture,
@@ -540,6 +534,7 @@ function ProblemScreen({
   origin,
   stockReady,
 }: {
+  apiError: string | null;
   generatedProblem: GeneratedProblem;
   isGenerating: boolean;
   onCapture: () => void;
@@ -548,7 +543,7 @@ function ProblemScreen({
   origin: ProblemOrigin;
   stockReady: number;
 }) {
-  const originBadge =
+  const originTag =
     origin === 'stock'
       ? { label: 'ストック問題', tone: 'success' as const }
       : origin === 'api'
@@ -558,11 +553,11 @@ function ProblemScreen({
   return (
     <View style={styles.body}>
       <Dots total={10} active={3} current={4} />
-      <View style={styles.problemCard}>
-        <View style={styles.cardHeader}>
-          <Text style={type.caption}>{generatedProblem.title}</Text>
-          <Badge label={originBadge.label} tone={originBadge.tone} />
-        </View>
+      <View style={styles.problemHeader}>
+        <Text style={type.caption}>{generatedProblem.title}</Text>
+        <Tag label={originTag.label} tone={originTag.tone} />
+      </View>
+      <ScrollView style={styles.problemScroll}>
         <MathContent tone="problem" value={generatedProblem.problem} />
         {generatedProblem.latex ? (
           <View style={styles.latexBox}>
@@ -570,20 +565,22 @@ function ProblemScreen({
             <MathContent tone="compact" value={`$$${generatedProblem.latex}$$`} />
           </View>
         ) : null}
-        <Text style={type.footnote}>途中式もノートに書いて撮影してください。</Text>
-      </View>
-      <View style={styles.flexSpacer} />
+      </ScrollView>
+      <Text style={type.footnote}>途中式もノートに書いて撮影してください。</Text>
+      {apiError ? <Text style={styles.errorText}>{apiError}</Text> : null}
       <AppButton label="解答を撮影する" onPress={onCapture} />
       {stockReady > 0 ? (
         <AppButton
+          compact
           label={`ストックから次の問題（残り ${stockReady}）`}
           onPress={onNextStock}
           variant="secondary"
         />
       ) : (
         <AppButton
+          compact
           disabled={isGenerating}
-          label={isGenerating ? '生成中…' : 'APIで別問題を生成'}
+          label={isGenerating ? '生成中…' : 'APIで別問題を生成（数分かかります）'}
           onPress={onGenerate}
           variant="secondary"
         />
@@ -644,9 +641,6 @@ function GradingScreen({
       <Text style={styles.centerTitle}>
         {isGrading ? 'AI採点しています…' : '採点結果を準備しました'}
       </Text>
-      <Text style={styles.centerFootnote}>
-        OCR候補、手動入力、模範解答を同じ採点サービス境界へ渡しています。
-      </Text>
       <GroupedRows
         rows={[
           { label: '画像', value: capturedAnswer?.imageName ?? 'なし' },
@@ -673,32 +667,34 @@ function CorrectScreen({
   total: number;
 }) {
   return (
-    <ScrollView contentContainerStyle={styles.body}>
-      <Text style={styles.successTitle}>正解</Text>
-      <Card>
-        <Text style={type.caption}>認識した答え</Text>
-        <MathContent
-          tone="body"
-          value={gradingResult?.recognizedText ?? generatedProblem.answer}
+    <View style={styles.body}>
+      <View style={styles.resultHeader}>
+        <Text style={styles.successTitle}>正解</Text>
+        <Tag
+          label={`正解 ${mastered + 1} / あと ${Math.max(8 - mastered - 1, 0)} 問`}
+          tone="success"
         />
-      </Card>
-      <Card tone="success">
-        <Text style={type.caption}>AIフィードバック</Text>
-        <MathContent
-          tone="body"
-          value={gradingResult?.feedback ?? generatedProblem.explanation}
-        />
-      </Card>
-      <Card>
-        <Text style={type.caption}>模範解説</Text>
-        <MathContent tone="body" value={generatedProblem.explanation} />
-      </Card>
+      </View>
+      <ScrollView contentContainerStyle={styles.resultScroll} style={styles.flexSpacer}>
+        <Callout title="認識した答え" tone="neutral">
+          <MathContent
+            tone="body"
+            value={gradingResult?.recognizedText ?? generatedProblem.answer}
+          />
+        </Callout>
+        <Callout title="AIフィードバック" tone="success">
+          <MathContent
+            tone="body"
+            value={gradingResult?.feedback ?? generatedProblem.explanation}
+          />
+        </Callout>
+        <Callout title="模範解説" tone="accent">
+          <MathContent tone="body" value={generatedProblem.explanation} />
+        </Callout>
+      </ScrollView>
       <Dots total={total} active={mastered + 1} />
-      <Text style={styles.centerText}>
-        正解 {mastered + 1} / あと {Math.max(8 - mastered - 1, 0)} 問
-      </Text>
       <AppButton label="次へ" onPress={onNext} />
-    </ScrollView>
+    </View>
   );
 }
 
@@ -712,29 +708,30 @@ function WrongScreen({
   onNext: () => void;
 }) {
   return (
-    <ScrollView contentContainerStyle={styles.body}>
-      <Text style={styles.failTitle}>不正解</Text>
-      <Card tone="danger">
-        <Text style={type.caption}>認識した答え</Text>
-        <MathContent
-          tone="body"
-          value={gradingResult?.recognizedText ?? 'OCR結果なし'}
-        />
-      </Card>
-      <Card tone="success">
-        <Text style={type.caption}>AIフィードバック</Text>
-        <MathContent
-          tone="body"
-          value={gradingResult?.feedback ?? generatedProblem.explanation}
-        />
-      </Card>
-      <Card>
-        <Text style={type.caption}>模範解説</Text>
-        <MathContent tone="body" value={generatedProblem.explanation} />
-      </Card>
-      <Text style={type.footnote}>この問題はマスターするまで再び出題されます。</Text>
+    <View style={styles.body}>
+      <View style={styles.resultHeader}>
+        <Text style={styles.failTitle}>不正解</Text>
+        <Tag label="マスターするまで再出題" tone="warn" />
+      </View>
+      <ScrollView contentContainerStyle={styles.resultScroll} style={styles.flexSpacer}>
+        <Callout title="認識した答え" tone="danger">
+          <MathContent
+            tone="body"
+            value={gradingResult?.recognizedText ?? 'OCR結果なし'}
+          />
+        </Callout>
+        <Callout title="AIフィードバック" tone="success">
+          <MathContent
+            tone="body"
+            value={gradingResult?.feedback ?? generatedProblem.explanation}
+          />
+        </Callout>
+        <Callout title="模範解説" tone="accent">
+          <MathContent tone="body" value={generatedProblem.explanation} />
+        </Callout>
+      </ScrollView>
       <AppButton label="再挑戦へ" onPress={onNext} />
-    </ScrollView>
+    </View>
   );
 }
 
@@ -754,22 +751,23 @@ function MissionResultScreen({
   const passed = mastered >= required;
   return (
     <View style={styles.body}>
-      <ProgressRing
-        label={`${mastered}/${total}`}
-        subLabel={`目標 ${required}`}
-        tone={passed ? 'success' : 'warn'}
-      />
-      <Card tone={passed ? 'success' : 'warn'}>
-        <Text style={type.headline}>
-          {passed ? '解除できます' : `あと${required - mastered}問で解除`}
-        </Text>
+      <View style={styles.missionCenter}>
+        <ProgressRing
+          label={`${mastered}/${total}`}
+          subLabel={`目標 ${required}`}
+          tone={passed ? 'success' : 'warn'}
+        />
+        <Dots total={total} active={mastered} />
+      </View>
+      <Callout
+        title={passed ? '解除できます' : `あと${required - mastered}問で解除`}
+        tone={passed ? 'success' : 'warn'}>
         <Text style={type.footnote}>
           {passed
             ? '今日のミッション条件を満たしました。対象アプリを解除します。'
             : 'まだ解けていない問題をもう一度。同じ問題をマスターして累計8問で解除です。'}
         </Text>
-      </Card>
-      <Dots total={total} active={mastered} />
+      </Callout>
       <View style={styles.flexSpacer} />
       <AppButton
         label={passed ? 'ロックを解除する' : '再挑戦に進む'}
@@ -788,12 +786,11 @@ function RetryScreen({
 }) {
   return (
     <View style={styles.body}>
-      <Card tone="warn">
-        <Text style={type.headline}>あと{remaining}問で解除</Text>
+      <Callout title={`あと${remaining}問で解除`} tone="warn">
         <Text style={type.footnote}>
           まだ解けていない同じ問題にもう一度挑戦します。
         </Text>
-      </Card>
+      </Callout>
       <SectionLabel>再挑戦リスト</SectionLabel>
       <GroupedRows
         rows={[
@@ -833,12 +830,16 @@ function UnlockScreen({ onHome }: { onHome: () => void }) {
 }
 
 function SettingsScreen({
+  onChangeSettings,
   onResetRole,
   profile,
+  settings,
   stockReady,
 }: {
+  onChangeSettings: (settings: StudySettings) => void;
   onResetRole: () => void;
   profile: UserProfile | null;
+  settings: StudySettings;
   stockReady: number;
 }) {
   const roleLabel = !profile
@@ -852,7 +853,7 @@ function SettingsScreen({
           : '学習者（自分で管理）';
 
   return (
-    <ScrollView contentContainerStyle={styles.body}>
+    <View style={styles.body}>
       <SectionLabel>アカウント</SectionLabel>
       <GroupedRows
         rows={[
@@ -860,24 +861,34 @@ function SettingsScreen({
           { label: '役割の選択をやり直す', onPress: onResetRole },
         ]}
       />
+      <SectionLabel>出題設定</SectionLabel>
+      <OptionSelect
+        label="学校"
+        onChange={school => onChangeSettings({ ...settings, school })}
+        options={schoolOptions}
+        value={settings.school}
+      />
+      <OptionSelect
+        label="難易度"
+        onChange={difficulty => onChangeSettings({ ...settings, difficulty })}
+        options={difficultyOptions}
+        value={settings.difficulty}
+      />
+      <Field
+        label="トピック"
+        onChangeText={topic => onChangeSettings({ ...settings, topic })}
+        placeholder="例: Probability Recurrence Relations"
+        value={settings.topic}
+      />
       <SectionLabel>ロック</SectionLabel>
       <GroupedRows
         rows={[
           { label: 'ロックスケジュール', value: '平日 16:00' },
           { label: '対象アプリ', value: 'SNS / 動画 / ゲーム' },
-          { label: '解除条件', value: '10問中8問' },
-        ]}
-      />
-      <SectionLabel>学習</SectionLabel>
-      <GroupedRows
-        rows={[
-          { label: '教科', value: '数学' },
-          { label: 'レベル', value: 'University of Tokyo' },
-          { label: '出題トピック', value: 'Probability Recurrence Relations' },
           { label: '問題ストック', value: `残り ${stockReady} 問` },
         ]}
       />
-    </ScrollView>
+    </View>
   );
 }
 
@@ -909,32 +920,31 @@ const styles = StyleSheet.create({
   },
   answerInput: {
     backgroundColor: palette.surface,
-    borderColor: palette.line,
     borderRadius: radius.inner,
-    borderWidth: 1,
     color: palette.ink,
     fontSize: 14,
-    minHeight: 76,
+    minHeight: 68,
     paddingHorizontal: spacing.md,
     paddingVertical: 10,
     textAlignVertical: 'top',
   },
   app: {
-    backgroundColor: palette.canvas,
+    backgroundColor: palette.bg,
     flex: 1,
     overflow: 'hidden',
   },
   bigTime: {
     color: palette.ink,
     fontFamily: fonts.mono,
-    fontSize: 42,
+    fontSize: 44,
     fontWeight: '700',
     letterSpacing: -1,
   },
   body: {
-    flexGrow: 1,
-    gap: spacing.md,
-    padding: spacing.lg,
+    flex: 1,
+    gap: spacing.sm + 2,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
   },
   bodyCenter: {
     alignItems: 'center',
@@ -957,11 +967,6 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     padding: spacing.md,
   },
-  cardHeader: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
   centerFootnote: {
     ...type.footnote,
     textAlign: 'center',
@@ -972,7 +977,7 @@ const styles = StyleSheet.create({
   },
   centerTitle: {
     ...type.headline,
-    fontSize: 18,
+    fontSize: 17,
     textAlign: 'center',
   },
   devField: {
@@ -998,7 +1003,7 @@ const styles = StyleSheet.create({
   },
   failTitle: {
     color: palette.danger,
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: '800',
     letterSpacing: -0.5,
   },
@@ -1008,8 +1013,15 @@ const styles = StyleSheet.create({
   fullWidth: {
     alignSelf: 'stretch',
   },
+  heroBlock: {
+    borderBottomColor: palette.line,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: 2,
+    paddingBottom: spacing.md,
+  },
   latexBox: {
-    gap: spacing.sm,
+    gap: spacing.xs,
+    marginTop: spacing.sm,
   },
   lockBody: {
     backgroundColor: palette.surface,
@@ -1025,20 +1037,31 @@ const styles = StyleSheet.create({
   },
   lockFooter: {
     alignSelf: 'stretch',
-    gap: spacing.md,
+    gap: spacing.sm,
   },
   lockGlyph: {
     alignItems: 'center',
-    marginTop: spacing.xl,
+    marginTop: spacing.lg,
+  },
+  lockMission: {
+    alignSelf: 'stretch',
+    borderBottomColor: palette.nightLine,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderTopColor: palette.nightLine,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    gap: 3,
+    paddingVertical: spacing.md,
   },
   lockMissionText: {
     color: palette.nightText,
     fontSize: 13,
+    textAlign: 'center',
   },
   lockMissionTitle: {
     color: palette.surface,
     fontSize: 14,
     fontWeight: '800',
+    textAlign: 'center',
   },
   lockMuted: {
     color: palette.nightTextFaint,
@@ -1049,9 +1072,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: palette.night,
     flex: 1,
-    gap: spacing.lg,
+    gap: spacing.md,
     padding: spacing.lg,
-    paddingTop: 48,
+    paddingTop: 40,
   },
   lockShackle: {
     borderColor: palette.surface,
@@ -1063,21 +1086,36 @@ const styles = StyleSheet.create({
   },
   lockTitle: {
     color: palette.surface,
-    fontSize: 26,
+    fontSize: 25,
     fontWeight: '800',
     letterSpacing: -0.5,
   },
-  problemCard: {
-    backgroundColor: palette.surface,
-    borderRadius: radius.card,
+  missionCenter: {
+    gap: spacing.sm + 2,
+    paddingVertical: spacing.xs,
+  },
+  problemHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  problemScroll: {
     flex: 1,
+  },
+  resultHeader: {
+    alignItems: 'baseline',
+    flexDirection: 'row',
     gap: spacing.md,
-    padding: spacing.lg,
+    justifyContent: 'space-between',
+  },
+  resultScroll: {
+    gap: spacing.md,
+    paddingBottom: spacing.sm,
   },
   scanBox: {
-    backgroundColor: palette.surface,
+    backgroundColor: palette.canvas,
     borderRadius: radius.inner,
-    height: 148,
+    height: 132,
     justifyContent: 'center',
     overflow: 'hidden',
   },
@@ -1094,8 +1132,13 @@ const styles = StyleSheet.create({
   },
   successTitle: {
     color: palette.success,
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: '800',
     letterSpacing: -0.5,
+  },
+  warnText: {
+    color: palette.warn,
+    fontSize: 12,
+    lineHeight: 18,
   },
 });

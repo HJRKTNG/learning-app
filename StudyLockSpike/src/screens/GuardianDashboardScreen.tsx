@@ -1,35 +1,41 @@
 import React, { useCallback, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import {
   AppButton,
-  Badge,
-  Card,
+  Field,
   GroupedRows,
+  OptionSelect,
   SectionLabel,
+  Tag,
 } from '../components/ui';
 import { palette, radius, spacing, type } from '../theme/theme';
-import {
-  GenerateProblemConfig,
-  GenerateProblemRequest,
-} from '../api/genStudyApi';
+import { GenerateProblemConfig } from '../api/genStudyApi';
 import {
   clearUsedProblems,
   poolSnapshot,
   prefetchProblems,
   PrefetchProgress,
 } from '../services/problemPool';
+import {
+  buildGenerateRequest,
+  difficultyOptions,
+  schoolOptions,
+  StudySettings,
+} from '../services/studySettings';
 import { generateLinkCode } from '../services/userProfile';
 
 type GuardianDashboardScreenProps = {
   apiConfig?: GenerateProblemConfig;
-  generateRequest: GenerateProblemRequest;
+  onChangeSettings: (settings: StudySettings) => void;
   onResetRole: () => void;
+  settings: StudySettings;
 };
 
 export function GuardianDashboardScreen({
   apiConfig,
-  generateRequest,
+  onChangeSettings,
   onResetRole,
+  settings,
 }: GuardianDashboardScreenProps) {
   const [pool, setPool] = useState(poolSnapshot);
   const [target, setTarget] = useState(3);
@@ -51,12 +57,17 @@ export function GuardianDashboardScreen({
     setPrefetchError(null);
     setProgress({ completed: 0, target });
     try {
-      const result = await prefetchProblems(apiConfig, generateRequest, target, {
-        onProgress: update => {
-          setProgress(update);
-          refreshPool();
+      const result = await prefetchProblems(
+        apiConfig,
+        buildGenerateRequest(settings),
+        target,
+        {
+          onProgress: update => {
+            setProgress(update);
+            refreshPool();
+          },
         },
-      });
+      );
       if (result.errors.length > 0) {
         setPrefetchError(
           `${result.errors.length}問の生成に失敗しました: ${result.errors[0]}`,
@@ -70,201 +81,154 @@ export function GuardianDashboardScreen({
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.body}>
-      <Text style={type.largeTitle}>見守り</Text>
+    <View style={styles.body}>
+      <View style={styles.titleRow}>
+        <Text style={type.largeTitle}>見守り</Text>
+        <Tag label="進行中 3/10・連続12日" tone="warn" />
+      </View>
 
-      <SectionLabel>学習者の今日</SectionLabel>
-      <Card>
-        <View style={styles.cardHeader}>
-          <Text style={type.headline}>今日のミッション</Text>
-          <Badge label="進行中" tone="warn" />
-        </View>
-        <View style={styles.statsRow}>
-          <Stat label="マスター" value="3/10" />
-          <Stat label="解除ライン" value="8問" />
-          <Stat label="連続達成" value="12日" />
-        </View>
-      </Card>
-
-      <SectionLabel>問題ストック</SectionLabel>
-      <Card>
-        <View style={styles.cardHeader}>
-          <Text style={type.headline}>事前生成プール</Text>
-          <Badge
-            label={`残り ${pool.ready} 問`}
-            tone={pool.ready > 0 ? 'success' : 'warn'}
-          />
-        </View>
-        <Text style={type.footnote}>
-          生成APIは1問あたり数分かかるため、ミッション前にまとめて生成してストックしておきます。
-        </Text>
-        <View style={styles.stepperRow}>
-          <Text style={styles.stepperLabel}>追加生成する問題数</Text>
-          <View style={styles.stepper}>
-            <Pressable
-              onPress={() => setTarget(value => Math.max(1, value - 1))}
-              style={styles.stepButton}>
-              <Text style={styles.stepGlyph}>−</Text>
-            </Pressable>
-            <Text style={styles.stepValue}>{target}</Text>
-            <Pressable
-              onPress={() => setTarget(value => Math.min(10, value + 1))}
-              style={styles.stepButton}>
-              <Text style={styles.stepGlyph}>＋</Text>
-            </Pressable>
-          </View>
-        </View>
-        {isPrefetching && progress ? (
-          <View style={styles.progressTrack}>
-            <View
-              style={[
-                styles.progressFill,
-                {
-                  width: `${Math.max(
-                    6,
-                    (progress.completed / progress.target) * 100,
-                  )}%`,
-                },
-              ]}
-            />
-          </View>
-        ) : null}
-        {isPrefetching && progress ? (
-          <Text style={type.footnote}>
-            生成中 {progress.completed} / {progress.target} 問（数分かかる場合があります）
-          </Text>
-        ) : null}
-        {prefetchError ? (
-          <Text style={styles.errorText}>{prefetchError}</Text>
-        ) : null}
-        <AppButton
-          disabled={isPrefetching}
-          label={isPrefetching ? '生成しています…' : `${target}問をまとめて生成`}
-          onPress={runPrefetch}
+      <View style={styles.stockHeader}>
+        <SectionLabel>問題ストック</SectionLabel>
+        <Tag
+          label={pool.ready > 0 ? `残り ${pool.ready} 問` : 'ストックなし'}
+          tone={pool.ready > 0 ? 'success' : 'warn'}
         />
-        {pool.used > 0 ? (
-          <AppButton
-            label={`使用済み ${pool.used} 問を整理`}
-            onPress={() => {
-              clearUsedProblems();
-              refreshPool();
-            }}
-            variant="ghost"
+      </View>
+      <View style={styles.stepperRow}>
+        <Text style={styles.stepperLabel}>追加生成する問題数</Text>
+        <View style={styles.stepper}>
+          <Pressable
+            onPress={() => setTarget(value => Math.max(1, value - 1))}
+            style={styles.stepButton}>
+            <Text style={styles.stepGlyph}>−</Text>
+          </Pressable>
+          <Text style={styles.stepValue}>{target}</Text>
+          <Pressable
+            onPress={() => setTarget(value => Math.min(10, value + 1))}
+            style={styles.stepButton}>
+            <Text style={styles.stepGlyph}>＋</Text>
+          </Pressable>
+        </View>
+      </View>
+      {isPrefetching && progress ? (
+        <View style={styles.progressTrack}>
+          <View
+            style={[
+              styles.progressFill,
+              {
+                width: `${Math.max(
+                  6,
+                  (progress.completed / progress.target) * 100,
+                )}%`,
+              },
+            ]}
           />
-        ) : null}
-      </Card>
+        </View>
+      ) : null}
+      {isPrefetching && progress ? (
+        <Text style={type.footnote}>
+          生成中 {progress.completed} / {progress.target} 問（1問数分かかります）
+        </Text>
+      ) : null}
+      {prefetchError ? (
+        <Text style={styles.errorText}>{prefetchError}</Text>
+      ) : null}
+      <AppButton
+        compact
+        disabled={isPrefetching}
+        label={isPrefetching ? '生成しています…' : `${target}問をまとめて生成`}
+        onPress={runPrefetch}
+      />
+      {pool.used > 0 && !isPrefetching ? (
+        <Pressable onPress={() => {
+          clearUsedProblems();
+          refreshPool();
+        }}>
+          <Text style={styles.inlineAction}>使用済み {pool.used} 問を整理</Text>
+        </Pressable>
+      ) : null}
 
-      <SectionLabel>ロック設定</SectionLabel>
+      <SectionLabel>出題設定</SectionLabel>
+      <OptionSelect
+        label="学校"
+        onChange={school => onChangeSettings({ ...settings, school })}
+        options={schoolOptions}
+        value={settings.school}
+      />
+      <OptionSelect
+        label="難易度"
+        onChange={difficulty => onChangeSettings({ ...settings, difficulty })}
+        options={difficultyOptions}
+        value={settings.difficulty}
+      />
+      <Field
+        label="トピック"
+        onChangeText={topic => onChangeSettings({ ...settings, topic })}
+        placeholder="例: Probability Recurrence Relations"
+        value={settings.topic}
+      />
+
+      <View style={styles.flexSpacer} />
+
+      <SectionLabel>ロックと連携</SectionLabel>
       <GroupedRows
         rows={[
           { label: 'ロックスケジュール', value: '平日 16:00' },
-          { label: '対象アプリ', value: 'SNS / 動画 / ゲーム' },
           { label: '解除条件', value: '10問中8問' },
+          {
+            label: '連携コード',
+            onPress: () => setLinkCode(generateLinkCode()),
+            value: linkCode ?? 'タップして発行',
+          },
+          { label: '役割の選択をやり直す', onPress: onResetRole },
         ]}
       />
-
-      <SectionLabel>出題設定</SectionLabel>
-      <GroupedRows
-        rows={[
-          { label: '教科', value: generateRequest.subject },
-          { label: 'レベル', value: generateRequest.level },
-          { label: 'トピック', value: generateRequest.topic },
-        ]}
-      />
-
-      <SectionLabel>学習者との連携</SectionLabel>
-      <Card tone="accent">
-        <Text style={type.headline}>連携コード</Text>
-        {linkCode ? (
-          <Text style={styles.linkCode}>{linkCode}</Text>
-        ) : (
-          <Text style={type.footnote}>
-            コードを発行して学習者に伝えると、このダッシュボードと連携できます。
-          </Text>
-        )}
-        <AppButton
-          label={linkCode ? 'コードを再発行' : 'コードを発行'}
-          onPress={() => setLinkCode(generateLinkCode())}
-          variant="secondary"
-        />
-      </Card>
-
-      <GroupedRows rows={[{ label: '役割の選択をやり直す', onPress: onResetRole }]} />
-    </ScrollView>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.stat}>
-      <Text style={styles.statValue}>{value}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   body: {
-    gap: spacing.md,
-    padding: spacing.lg,
-    paddingBottom: spacing.xl,
-  },
-  cardHeader: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flex: 1,
+    gap: spacing.sm + 2,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
   },
   errorText: {
     color: palette.danger,
     fontSize: 12,
     lineHeight: 18,
   },
-  linkCode: {
-    color: palette.accentDeep,
-    fontSize: 30,
-    fontWeight: '800',
-    letterSpacing: 6,
+  flexSpacer: {
+    flex: 1,
+  },
+  inlineAction: {
+    color: palette.accent,
+    fontSize: 13,
+    fontWeight: '600',
     textAlign: 'center',
   },
   progressFill: {
     backgroundColor: palette.accent,
     borderRadius: 3,
-    height: 6,
+    height: 5,
   },
   progressTrack: {
     backgroundColor: palette.line,
     borderRadius: 3,
-    height: 6,
+    height: 5,
     overflow: 'hidden',
-  },
-  stat: {
-    flex: 1,
-    gap: 2,
-  },
-  statLabel: {
-    ...type.caption,
-  },
-  statValue: {
-    color: palette.ink,
-    fontSize: 20,
-    fontWeight: '800',
-    letterSpacing: -0.4,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    marginTop: spacing.xs,
   },
   stepButton: {
     alignItems: 'center',
     backgroundColor: palette.canvas,
-    height: 36,
+    height: 34,
     justifyContent: 'center',
     width: 40,
   },
   stepGlyph: {
     color: palette.accent,
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '700',
   },
   stepValue: {
@@ -292,5 +256,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     gap: spacing.md,
+  },
+  stockHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: spacing.xs,
+  },
+  titleRow: {
+    alignItems: 'baseline',
+    flexDirection: 'row',
+    gap: spacing.md,
+    justifyContent: 'space-between',
   },
 });

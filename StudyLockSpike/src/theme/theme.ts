@@ -1,12 +1,13 @@
 import { Platform } from 'react-native';
 
-// 「静かな信頼」: 深い藍をアンカーに、ロイヤルブルーを唯一のアクセントとする
-// iOSネイティブ調のデザイントークン。色・余白・角丸はすべてここから参照する。
+// 「静かな信頼」: 深い藍をアンカーに、ロイヤルブルーを唯一のアクセントとする。
+// カードや影は使わず、白地＋ヘアライン＋タイポグラフィで構成する。
 export const palette = {
   accent: '#2456E6',
   accentDeep: '#0F2E7E',
   accentSoft: '#E9EEFB',
-  canvas: '#F2F4F8',
+  bg: '#FFFFFF',
+  canvas: '#F4F5F8',
   danger: '#C93B3B',
   dangerSoft: '#F9E9E9',
   ink: '#0C1B33',

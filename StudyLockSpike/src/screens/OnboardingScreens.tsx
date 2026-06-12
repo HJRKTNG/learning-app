@@ -8,32 +8,41 @@ import {
   UserProfile,
 } from '../services/userProfile';
 
-function RoleCard({
+function RoleRow({
   body,
   onPress,
   selected,
+  showRadio,
   tag,
   title,
 }: {
   body: string;
   onPress: () => void;
   selected?: boolean;
+  showRadio?: boolean;
   tag: string;
   title: string;
 }) {
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.roleCard,
-        selected && styles.roleCardSelected,
-        pressed && styles.roleCardPressed,
-      ]}>
-      <Text style={[styles.roleTag, selected && styles.roleTagSelected]}>
-        {tag}
-      </Text>
-      <Text style={styles.roleTitle}>{title}</Text>
-      <Text style={styles.roleBody}>{body}</Text>
+      style={({ pressed }) => [styles.roleRow, pressed && styles.roleRowPressed]}>
+      <View style={styles.roleRowText}>
+        <Text style={[styles.roleTag, selected && styles.roleTagSelected]}>
+          {tag}
+        </Text>
+        <Text style={[styles.roleTitle, selected && styles.roleTitleSelected]}>
+          {title}
+        </Text>
+        <Text style={styles.roleBody}>{body}</Text>
+      </View>
+      {showRadio ? (
+        <View style={[styles.radio, selected && styles.radioSelected]}>
+          {selected ? <View style={styles.radioDot} /> : null}
+        </View>
+      ) : (
+        <Text style={styles.chevron}>›</Text>
+      )}
     </Pressable>
   );
 }
@@ -58,13 +67,13 @@ export function RoleSelectScreen({
       </View>
       <View style={styles.roleBlock}>
         <Text style={type.caption}>どちらで使いますか</Text>
-        <RoleCard
+        <RoleRow
           body="お子さまの学習状況を見守り、ロックスケジュールや問題の設定を管理します。"
           onPress={() => onSelectGuardian(createGuardianProfile())}
           tag="GUARDIAN"
           title="保護者として使う"
         />
-        <RoleCard
+        <RoleRow
           body="ミッションを解いてアプリのロックを解除します。保護者との連携も選べます。"
           onPress={onSelectLearner}
           tag="LEARNER"
@@ -106,10 +115,11 @@ export function LearnerSetupScreen({
       <NavBar onBack={onBack} title="学習者の設定" />
       <View style={styles.setupBlock}>
         <Text style={styles.setupTitle}>管理方法を選ぶ</Text>
-        <RoleCard
+        <RoleRow
           body="保護者から受け取った連携コードを入力すると、見守りと設定の管理がつながります。"
           onPress={() => setMode('guardian-linked')}
           selected={mode === 'guardian-linked'}
+          showRadio
           tag="LINK"
           title="保護者アカウントと連携"
         />
@@ -123,10 +133,11 @@ export function LearnerSetupScreen({
             value={linkCode}
           />
         ) : null}
-        <RoleCard
+        <RoleRow
           body="自分でロックスケジュールと解除条件を決めて、セルフコントロールに使います。"
           onPress={() => setMode('self-managed')}
           selected={mode === 'self-managed'}
+          showRadio
           tag="SELF"
           title="自分で管理する"
         />
@@ -146,7 +157,7 @@ const styles = StyleSheet.create({
   brandBlock: {
     alignItems: 'center',
     gap: spacing.sm,
-    paddingTop: 40,
+    paddingTop: 36,
   },
   brandCopy: {
     ...type.body,
@@ -156,32 +167,35 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: palette.accent,
     borderRadius: 22,
-    height: 72,
+    height: 68,
     justifyContent: 'center',
-    width: 72,
+    width: 68,
   },
   brandMarkInner: {
     backgroundColor: palette.surface,
     borderRadius: 7,
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
-    height: 26,
-    width: 30,
+    borderTopLeftRadius: 17,
+    borderTopRightRadius: 17,
+    height: 24,
+    width: 28,
   },
   brandName: {
     ...type.title,
     marginTop: spacing.xs,
   },
+  chevron: {
+    color: palette.inkFaint,
+    fontSize: 22,
+    fontWeight: '400',
+  },
   codeInput: {
-    backgroundColor: palette.surface,
-    borderColor: palette.accent,
+    backgroundColor: palette.canvas,
     borderRadius: radius.inner,
-    borderWidth: 1.5,
     color: palette.ink,
     fontSize: 17,
     fontWeight: '700',
     letterSpacing: 3,
-    minHeight: 48,
+    minHeight: 46,
     paddingHorizontal: spacing.md,
     textAlign: 'center',
   },
@@ -190,29 +204,51 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xl,
     textAlign: 'center',
   },
+  radio: {
+    alignItems: 'center',
+    borderColor: palette.line,
+    borderRadius: 11,
+    borderWidth: 2,
+    height: 22,
+    justifyContent: 'center',
+    width: 22,
+  },
+  radioDot: {
+    backgroundColor: palette.accent,
+    borderRadius: 5,
+    height: 10,
+    width: 10,
+  },
+  radioSelected: {
+    borderColor: palette.accent,
+  },
   roleBlock: {
     flex: 1,
-    gap: spacing.md,
+    gap: spacing.sm,
     justifyContent: 'center',
-    padding: spacing.lg,
+    paddingHorizontal: spacing.lg,
   },
   roleBody: {
     ...type.footnote,
     color: palette.inkSoft,
   },
-  roleCard: {
-    backgroundColor: palette.surface,
-    borderColor: palette.line,
-    borderRadius: radius.card,
-    borderWidth: 1.5,
-    gap: 6,
-    padding: spacing.lg,
+  roleRow: {
+    alignItems: 'center',
+    borderBottomColor: palette.line,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderTopColor: palette.line,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginBottom: -StyleSheet.hairlineWidth,
+    paddingVertical: spacing.md,
   },
-  roleCardPressed: {
-    backgroundColor: palette.accentSoft,
+  roleRowPressed: {
+    backgroundColor: palette.canvas,
   },
-  roleCardSelected: {
-    borderColor: palette.accent,
+  roleRowText: {
+    flex: 1,
+    gap: 3,
   },
   roleTag: {
     ...type.caption,
@@ -223,16 +259,20 @@ const styles = StyleSheet.create({
   },
   roleTitle: {
     ...type.headline,
-    fontSize: 18,
+    fontSize: 17,
+  },
+  roleTitleSelected: {
+    color: palette.accentDeep,
   },
   screen: {
-    backgroundColor: palette.canvas,
+    backgroundColor: palette.bg,
     flex: 1,
   },
   setupBlock: {
     flex: 1,
-    gap: spacing.md,
-    padding: spacing.lg,
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
   },
   setupFooter: {
     padding: spacing.lg,

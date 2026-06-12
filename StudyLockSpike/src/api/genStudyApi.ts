@@ -2,6 +2,7 @@ export type GenerateProblemRequest = {
   subject: string;
   level: string;
   topic: string;
+  difficulty?: string;
 };
 
 export type GenerateProblemConfig = {

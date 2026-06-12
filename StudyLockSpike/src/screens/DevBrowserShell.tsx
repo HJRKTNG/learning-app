@@ -14,7 +14,7 @@ import {
   LearningPreviewState,
   LearningScreenId,
 } from './LearningAppScreen';
-import { GeneratedProblem, GenerateProblemRequest } from '../api/genStudyApi';
+import { GeneratedProblem } from '../api/genStudyApi';
 import { clearPool, poolSnapshot } from '../services/problemPool';
 import { clearProfile, loadProfile } from '../services/userProfile';
 import { learningScreenOptions } from './learningScreenOptions';
@@ -30,14 +30,7 @@ const initialPreview: LearningPreviewState = {
   mastered: 3,
   required: 8,
   screen: 'home',
-  showApiPanel: true,
   total: 10,
-};
-
-const initialRequest: GenerateProblemRequest = {
-  level: 'University of Tokyo',
-  subject: 'math',
-  topic: 'Probability Recurrence Relations',
 };
 
 const initialScreenFromUrl = (): LearningScreenId => {
@@ -68,7 +61,6 @@ export function DevBrowserShell() {
   });
   const [apiUrl, setApiUrl] = useState(defaultApiUrl);
   const [apiToken, setApiToken] = useState(defaultApiToken);
-  const [request, setRequest] = useState<GenerateProblemRequest>(initialRequest);
   const [lastProblem, setLastProblem] = useState<GeneratedProblem | null>(null);
   const [pool, setPool] = useState(poolSnapshot);
   // プロフィールやストックをdev側でリセットしたら、プレビューを作り直して反映する
@@ -92,13 +84,6 @@ export function DevBrowserShell() {
     value: LearningPreviewState[Key],
   ) => {
     setPreview(current => ({ ...current, [key]: value }));
-  };
-
-  const updateRequest = <Key extends keyof GenerateProblemRequest>(
-    key: Key,
-    value: GenerateProblemRequest[Key],
-  ) => {
-    setRequest(current => ({ ...current, [key]: value }));
   };
 
   return (
@@ -161,11 +146,6 @@ export function DevBrowserShell() {
             onChange={value => updatePreview('locked', value)}
             value={preview.locked}
           />
-          <Toggle
-            label="API説明パネル"
-            onChange={value => updatePreview('showApiPanel', value)}
-            value={preview.showApiPanel}
-          />
         </View>
 
         <View style={styles.section}>
@@ -211,23 +191,9 @@ export function DevBrowserShell() {
               value={apiToken}
             />
           </View>
-          <DevTextInput
-            label="Subject"
-            onChangeText={value => updateRequest('subject', value)}
-            value={request.subject}
-          />
-          <DevTextInput
-            label="Level"
-            onChangeText={value => updateRequest('level', value)}
-            value={request.level}
-          />
-          <DevTextInput
-            label="Topic"
-            onChangeText={value => updateRequest('topic', value)}
-            value={request.topic}
-          />
           <Text style={styles.hint}>
             Tokenは `.env.local` の `VITE_GEN_STUDY_API_TOKEN` でも指定できます。
+            出題内容（学校・難易度・トピック）はアプリ内の設定画面または保護者ダッシュボードから選択します。
           </Text>
         </View>
 
@@ -256,7 +222,6 @@ export function DevBrowserShell() {
             <LearningAppScreen
               key={previewKey}
               apiConfig={apiConfig}
-              generateRequest={request}
               onGeneratedProblem={setLastProblem}
               onNavigate={(screen: LearningScreenId) =>
                 updatePreview('screen', screen)

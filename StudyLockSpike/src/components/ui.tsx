@@ -6,16 +6,18 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { cardShadow, fonts, palette, radius, spacing, type } from '../theme/theme';
+import { fonts, palette, radius, spacing, type } from '../theme/theme';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'night';
 
 export function AppButton({
+  compact,
   disabled,
   label,
   onPress,
   variant = 'primary',
 }: {
+  compact?: boolean;
   disabled?: boolean;
   label: string;
   onPress: () => void;
@@ -27,6 +29,7 @@ export function AppButton({
       onPress={onPress}
       style={({ pressed }) => [
         styles.button,
+        compact && styles.buttonCompact,
         variant === 'secondary' && styles.buttonSecondary,
         variant === 'ghost' && styles.buttonGhost,
         variant === 'night' && styles.buttonNight,
@@ -46,33 +49,16 @@ export function AppButton({
   );
 }
 
-export function Card({
-  children,
-  tone = 'surface',
-}: {
-  children: ReactNode;
-  tone?: 'surface' | 'accent' | 'success' | 'warn' | 'danger' | 'night';
-}) {
-  return (
-    <View
-      style={[
-        styles.card,
-        tone === 'accent' && styles.cardAccent,
-        tone === 'success' && styles.cardSuccess,
-        tone === 'warn' && styles.cardWarn,
-        tone === 'danger' && styles.cardDanger,
-        tone === 'night' && styles.cardNight,
-      ]}>
-      {children}
-    </View>
-  );
+export function Divider() {
+  return <View style={styles.divider} />;
 }
 
 export function SectionLabel({ children }: { children: ReactNode }) {
   return <Text style={styles.sectionLabel}>{children}</Text>;
 }
 
-export function Badge({
+// カードの代わりに使う、文字色だけのステータス表示
+export function Tag({
   label,
   tone = 'accent',
 }: {
@@ -82,13 +68,49 @@ export function Badge({
   return (
     <Text
       style={[
-        styles.badge,
-        tone === 'success' && styles.badgeSuccess,
-        tone === 'warn' && styles.badgeWarn,
-        tone === 'neutral' && styles.badgeNeutral,
+        styles.tag,
+        tone === 'success' && styles.tagSuccess,
+        tone === 'warn' && styles.tagWarn,
+        tone === 'neutral' && styles.tagNeutral,
       ]}>
       {label}
     </Text>
+  );
+}
+
+// カードの代わりに使う、左罫線つきの強調ブロック
+export function Callout({
+  children,
+  title,
+  tone = 'neutral',
+}: {
+  children: ReactNode;
+  title?: string;
+  tone?: 'neutral' | 'accent' | 'success' | 'warn' | 'danger';
+}) {
+  return (
+    <View
+      style={[
+        styles.callout,
+        tone === 'accent' && styles.calloutAccent,
+        tone === 'success' && styles.calloutSuccess,
+        tone === 'warn' && styles.calloutWarn,
+        tone === 'danger' && styles.calloutDanger,
+      ]}>
+      {title ? (
+        <Text
+          style={[
+            styles.calloutTitle,
+            tone === 'accent' && styles.calloutTitleAccent,
+            tone === 'success' && styles.calloutTitleSuccess,
+            tone === 'warn' && styles.calloutTitleWarn,
+            tone === 'danger' && styles.calloutTitleDanger,
+          ]}>
+          {title}
+        </Text>
+      ) : null}
+      {children}
+    </View>
   );
 }
 
@@ -98,9 +120,10 @@ export type GroupedRow = {
   onPress?: () => void;
 };
 
+// エッジトゥエッジのヘアライン区切りリスト（背景・角丸なし）
 export function GroupedRows({ rows }: { rows: GroupedRow[] }) {
   return (
-    <View style={styles.group}>
+    <View>
       {rows.map((row, index) => {
         const inner = (
           <>
@@ -109,27 +132,61 @@ export function GroupedRows({ rows }: { rows: GroupedRow[] }) {
             {row.onPress ? <Text style={styles.rowChevron}>›</Text> : null}
           </>
         );
-        const isLast = index === rows.length - 1;
+        const rowStyle = [styles.row, index === 0 && styles.rowFirst];
         if (row.onPress) {
           return (
             <Pressable
               key={row.label}
               onPress={row.onPress}
-              style={({ pressed }) => [
-                styles.row,
-                isLast && styles.rowLast,
-                pressed && styles.rowPressed,
-              ]}>
+              style={({ pressed }) => [rowStyle, pressed && styles.rowPressed]}>
               {inner}
             </Pressable>
           );
         }
         return (
-          <View key={row.label} style={[styles.row, isLast && styles.rowLast]}>
+          <View key={row.label} style={rowStyle}>
             {inner}
           </View>
         );
       })}
+    </View>
+  );
+}
+
+// 学校・難易度などを1行で選ぶフラットなセレクター
+export function OptionSelect<Id extends string>({
+  label,
+  onChange,
+  options,
+  value,
+}: {
+  label: string;
+  onChange: (id: Id) => void;
+  options: Array<{ id: Id; label: string }>;
+  value: Id;
+}) {
+  return (
+    <View style={styles.optionRow}>
+      <Text style={styles.optionLabel}>{label}</Text>
+      <View style={styles.optionChoices}>
+        {options.map(option => {
+          const selected = option.id === value;
+          return (
+            <Pressable
+              key={option.id}
+              onPress={() => onChange(option.id)}
+              style={[styles.option, selected && styles.optionSelected]}>
+              <Text
+                style={[
+                  styles.optionText,
+                  selected && styles.optionTextSelected,
+                ]}>
+                {option.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
     </View>
   );
 }
@@ -279,45 +336,27 @@ export function Field({
 }
 
 const styles = StyleSheet.create({
-  badge: {
-    backgroundColor: palette.accentSoft,
-    borderRadius: radius.badge,
-    color: palette.accentDeep,
-    fontSize: 11,
-    fontWeight: '800',
-    overflow: 'hidden',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  badgeNeutral: {
-    backgroundColor: palette.canvas,
-    color: palette.inkSoft,
-  },
-  badgeSuccess: {
-    backgroundColor: palette.successSoft,
-    color: palette.success,
-  },
-  badgeWarn: {
-    backgroundColor: palette.warnSoft,
-    color: palette.warn,
-  },
   button: {
     alignItems: 'center',
     backgroundColor: palette.accent,
     borderRadius: radius.control,
     justifyContent: 'center',
-    minHeight: 52,
+    minHeight: 50,
     paddingHorizontal: spacing.lg,
+  },
+  buttonCompact: {
+    minHeight: 42,
   },
   buttonDisabled: {
     opacity: 0.45,
   },
   buttonGhost: {
     backgroundColor: 'transparent',
+    minHeight: 38,
   },
   buttonLabel: {
     color: palette.surface,
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
     letterSpacing: -0.2,
   },
@@ -339,33 +378,49 @@ const styles = StyleSheet.create({
   buttonSecondary: {
     backgroundColor: palette.accentSoft,
   },
-  card: {
-    backgroundColor: palette.surface,
-    borderRadius: radius.card,
-    gap: spacing.sm,
-    padding: spacing.lg,
-    ...cardShadow,
+  callout: {
+    borderLeftColor: palette.line,
+    borderLeftWidth: 2,
+    gap: 4,
+    paddingLeft: spacing.md,
+    paddingVertical: 2,
   },
-  cardAccent: {
-    backgroundColor: palette.accentSoft,
+  calloutAccent: {
+    borderLeftColor: palette.accent,
   },
-  cardDanger: {
-    backgroundColor: palette.dangerSoft,
+  calloutDanger: {
+    borderLeftColor: palette.danger,
   },
-  cardNight: {
-    backgroundColor: palette.nightSoft,
+  calloutSuccess: {
+    borderLeftColor: palette.success,
   },
-  cardSuccess: {
-    backgroundColor: palette.successSoft,
+  calloutTitle: {
+    ...type.caption,
   },
-  cardWarn: {
-    backgroundColor: palette.warnSoft,
+  calloutTitleAccent: {
+    color: palette.accentDeep,
+  },
+  calloutTitleDanger: {
+    color: palette.danger,
+  },
+  calloutTitleSuccess: {
+    color: palette.success,
+  },
+  calloutTitleWarn: {
+    color: palette.warn,
+  },
+  calloutWarn: {
+    borderLeftColor: palette.warn,
+  },
+  divider: {
+    backgroundColor: palette.line,
+    height: StyleSheet.hairlineWidth,
   },
   dot: {
     backgroundColor: palette.line,
-    borderRadius: 4,
+    borderRadius: 3,
     flex: 1,
-    height: 6,
+    height: 5,
   },
   dotActive: {
     backgroundColor: palette.success,
@@ -378,31 +433,23 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   field: {
-    gap: 6,
+    gap: 5,
   },
   fieldInput: {
-    backgroundColor: palette.surface,
-    borderColor: palette.line,
+    backgroundColor: palette.canvas,
     borderRadius: radius.inner,
-    borderWidth: 1,
     color: palette.ink,
-    fontSize: 15,
-    minHeight: 44,
+    fontSize: 14,
+    minHeight: 40,
     paddingHorizontal: spacing.md,
   },
   fieldLabel: {
     ...type.caption,
   },
-  group: {
-    backgroundColor: palette.surface,
-    borderRadius: radius.card,
-    overflow: 'hidden',
-    ...cardShadow,
-  },
   nav: {
     alignItems: 'center',
     flexDirection: 'row',
-    minHeight: 48,
+    minHeight: 44,
     paddingHorizontal: spacing.md,
   },
   navBack: {
@@ -421,28 +468,62 @@ const styles = StyleSheet.create({
     letterSpacing: -0.2,
     textAlign: 'center',
   },
+  option: {
+    borderBottomColor: 'transparent',
+    borderBottomWidth: 2,
+    paddingBottom: 4,
+    paddingTop: 6,
+  },
+  optionChoices: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  optionLabel: {
+    color: palette.ink,
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  optionRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.md,
+    minHeight: 40,
+  },
+  optionSelected: {
+    borderBottomColor: palette.accent,
+  },
+  optionText: {
+    color: palette.inkFaint,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  optionTextSelected: {
+    color: palette.accentDeep,
+    fontWeight: '700',
+  },
   ring: {
     alignItems: 'center',
     alignSelf: 'center',
     backgroundColor: palette.accent,
-    borderRadius: 66,
-    height: 132,
+    borderRadius: 60,
+    height: 120,
     justifyContent: 'center',
-    width: 132,
+    width: 120,
   },
   ringInner: {
     alignItems: 'center',
-    backgroundColor: palette.surface,
-    borderRadius: 52,
-    gap: 2,
-    height: 104,
+    backgroundColor: palette.bg,
+    borderRadius: 47,
+    gap: 1,
+    height: 94,
     justifyContent: 'center',
-    width: 104,
+    width: 94,
   },
   ringLabel: {
     color: palette.ink,
     fontFamily: fonts.mono,
-    fontSize: 26,
+    fontSize: 24,
     fontWeight: '800',
   },
   ringSub: {
@@ -462,40 +543,39 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     flexDirection: 'row',
     gap: spacing.md,
-    minHeight: 50,
-    paddingHorizontal: spacing.lg,
+    minHeight: 44,
   },
   rowChevron: {
     color: palette.inkFaint,
-    fontSize: 20,
+    fontSize: 19,
     fontWeight: '400',
+  },
+  rowFirst: {
+    borderTopColor: palette.line,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
   rowLabel: {
     color: palette.ink,
     flex: 1,
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
-  },
-  rowLast: {
-    borderBottomWidth: 0,
   },
   rowPressed: {
     backgroundColor: palette.canvas,
   },
   rowValue: {
     color: palette.inkSoft,
-    fontSize: 14,
+    fontSize: 13,
   },
   sectionLabel: {
     ...type.caption,
-    paddingHorizontal: spacing.xs,
   },
   statusBar: {
     alignItems: 'flex-end',
     flexDirection: 'row',
-    height: 38,
+    height: 36,
     justifyContent: 'space-between',
-    paddingBottom: 6,
+    paddingBottom: 5,
     paddingHorizontal: spacing.lg,
   },
   statusBarNight: {
@@ -515,19 +595,33 @@ const styles = StyleSheet.create({
     gap: 3,
     minWidth: 56,
   },
+  tag: {
+    color: palette.accentDeep,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  tagNeutral: {
+    color: palette.inkFaint,
+  },
+  tagSuccess: {
+    color: palette.success,
+  },
+  tagWarn: {
+    color: palette.warn,
+  },
   tabBar: {
-    backgroundColor: palette.surface,
+    backgroundColor: palette.bg,
     borderTopColor: palette.line,
     borderTopWidth: StyleSheet.hairlineWidth,
     flexDirection: 'row',
     justifyContent: 'space-around',
-    paddingBottom: 16,
-    paddingTop: 10,
+    paddingBottom: 14,
+    paddingTop: 8,
   },
   tabDot: {
     backgroundColor: 'transparent',
     borderRadius: 3,
-    height: 5,
+    height: 4,
     width: 18,
   },
   tabDotActive: {
