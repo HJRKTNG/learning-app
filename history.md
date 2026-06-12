@@ -5,6 +5,7 @@
 - GitHubリモート `https://github.com/HJRKTNG/learning-app` を `origin` として登録し、`main` ブランチをpushして共同開発できるようにした。
 - リポジトリ直下に `.gitignore` を追加し、`.DS_Store` を追跡対象から除外。
 - UI設計資料 `学習アプリワークフロー/`（UIマップHTML、ワイヤーフロー、スクリーンショット）をリポジトリに追加し、共同開発者が参照できるようにした。
+- 問題の事前生成プール `src/services/problemPool.ts` を追加。生成APIが1問あたり数分かかる前提で、指定数を直列に事前生成し、1問完了ごとに永続化（Webは `localStorage`、ネイティブはメモリフォールバック）する方式にした。`takeNextProblem` でストックから順に消費し、使用済みフラグを付ける。Jestテスト3件を追加し、`tsc` と合わせて成功を確認。
 
 ## 2026-05-23
 
